@@ -283,6 +283,43 @@ def extract_eom_clusters(condensed_tree, allow_single_cluster=False):
     return np.asarray([node for node, selected in selected_clusters.items() if selected])
 
 
+@numba.njit(parallel=True)
+def get_cluster_labelling_at_cut(linkage_tree, cut, min_cluster_size):
+
+    root = 2 * linkage_tree.shape[0]
+    num_points = linkage_tree.shape[0] + 1
+    result = np.empty(num_points, dtype=np.intp)
+    disjoint_set = ds_rank_create(root + 1)
+
+    cluster = num_points
+    for i in range(linkage_tree.shape[0]):
+        if linkage_tree[i, 2] < cut:
+            ds_union_by_rank(disjoint_set, np.intp(linkage_tree[i, 0]), cluster)
+            ds_union_by_rank(disjoint_set, np.intp(linkage_tree[i, 1]), cluster)
+        cluster += 1
+
+    cluster_size = np.zeros(cluster, dtype=np.intp)
+    for n in range(num_points):
+        cluster = ds_find(disjoint_set, n)
+        cluster_size[cluster] += 1
+        result[n] = cluster
+
+    cluster_label_map = {-1: -1}
+    cluster_label = 0
+    unique_labels = np.unique(result)
+
+    for cluster in unique_labels:
+        if cluster_size[cluster] < min_cluster_size:
+            cluster_label_map[cluster] = -1
+        else:
+            cluster_label_map[cluster] = cluster_label
+            cluster_label += 1
+
+    for n in numba.prange(num_points):
+        result[n] = cluster_label_map[result[n]]
+
+    return result
+
 @numba.njit()
 def get_cluster_label_vector(
         tree,

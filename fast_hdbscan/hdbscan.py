@@ -13,15 +13,18 @@ from .cluster_trees import (
     condense_tree,
     extract_eom_clusters,
     extract_leaves,
+    get_cluster_labelling_at_cut,
     get_cluster_label_vector,
     get_point_membership_strength_vector,
 )
 
 try:
     from hdbscan.plots import CondensedTree, SingleLinkageTree, MinimumSpanningTree
+
     _HAVE_HDBSCAN = True
 except ImportError:
     _HAVE_HDBSCAN = False
+
 
 def to_numpy_rec_array(named_tuple_tree):
     size = named_tuple_tree.parent.shape[0]
@@ -35,12 +38,13 @@ def to_numpy_rec_array(named_tuple_tree):
         ],
     )
 
-    result['parent'] = named_tuple_tree.parent
-    result['child'] = named_tuple_tree.child
-    result['lambda_val'] = named_tuple_tree.lambda_val
-    result['child_size'] = named_tuple_tree.child_size
+    result["parent"] = named_tuple_tree.parent
+    result["child"] = named_tuple_tree.child
+    result["lambda_val"] = named_tuple_tree.lambda_val
+    result["child_size"] = named_tuple_tree.child_size
 
     return result
+
 
 def remap_condensed_tree(tree, internal_to_raw, outliers):
     """
@@ -120,6 +124,7 @@ def remap_single_linkage_tree(tree, internal_to_raw, outliers):
         last_cluster_size += 1
     tree = np.vstack([tree, outlier_tree])
     return tree
+
 
 def fast_hdbscan(
     data,
@@ -220,6 +225,13 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             self.probabilities_ = new_probabilities
 
         return self
+
+    def dbscan_clustering(self, epsilon):
+        return get_cluster_labelling_at_cut(
+            self._single_linkage_tree,
+            epsilon,
+            self.min_samples if self.min_samples is not None else self.min_cluster_size,
+        )
 
     @property
     def condensed_tree_(self):
