@@ -2,7 +2,7 @@ import numba
 import numpy as np
 
 from .disjoint_set import ds_rank_create, ds_find, ds_union_by_rank
-from numba_kdtree import parallel_tree_query, rdist, point_to_node_lower_bound_rdist
+from .numba_kdtree import parallel_tree_query, rdist, point_to_node_lower_bound_rdist
 
 @numba.njit()
 def merge_components(disjoint_set, candidate_neighbors, candidate_neighbor_distances, point_components):
@@ -254,8 +254,8 @@ def parallel_boruvka(tree, min_samples=10):
     n_components = point_components.shape[0]
 
     if min_samples > 1:
-        distances, neighbors = parallel_tree_query(tree, tree.data, k=min_samples + 1)
-        core_distances = np.power(distances.T[-1], 2)
+        distances, neighbors = parallel_tree_query(tree, tree.data, k=min_samples + 1, output_rdist=True)
+        core_distances = distances.T[-1]
         edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
         update_component_vectors(tree, components_disjoint_set, node_components, point_components)
     else:

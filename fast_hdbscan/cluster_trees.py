@@ -247,7 +247,7 @@ def unselect_below_node(node, cluster_tree, selected_clusters):
         selected_clusters[child] = False
 
 
-@numba.njit()
+@numba.njit(fastmath=True)
 def eom_recursion(node, cluster_tree, node_scores, selected_clusters):
     current_score = node_scores[node]
 
@@ -275,7 +275,7 @@ def extract_eom_clusters(condensed_tree, allow_single_cluster=False):
 
     if allow_single_cluster:
         eom_recursion(cluster_tree_root, cluster_tree, node_scores, selected_clusters)
-    else:
+    elif len(node_scores) > 1:
         root_children = cluster_tree.child[cluster_tree.parent == cluster_tree_root]
         for child_node in root_children:
             eom_recursion(child_node, cluster_tree, node_scores, selected_clusters)

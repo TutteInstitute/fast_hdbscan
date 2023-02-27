@@ -214,4 +214,7 @@ def parallel_tree_query(tree, data, k=10, output_rdist=False):
         heap_priorities, heap_indices = result[0][i], result[1][i]
         tree_query_recursion(tree, 0, data[i], heap_priorities, heap_indices, distance_lower_bound)
 
-    return deheap_sort(np.sqrt(result[0]), result[1])
+    if output_rdist:
+        return deheap_sort(result[0], result[1])
+    else:
+        return deheap_sort(np.sqrt(result[0]), result[1])

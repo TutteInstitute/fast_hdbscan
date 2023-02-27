@@ -1,0 +1,3 @@
+numpy>=1.21
+numba>=0.56
+scikit-learn>=1.1
