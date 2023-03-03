@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. image:: doc/hdbscan_logo.png
+.. image:: hdbscan_logo.png
   :width: 600
   :alt: HDBSCAN logo
   :align: center
