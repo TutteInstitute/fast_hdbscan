@@ -1,7 +1,4 @@
-.. fast_hdbscan documentation master file, created by
-   sphinx-quickstart on Wed Feb 22 18:39:23 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. -*- mode: rst -*-
 
 .. image:: doc/hdbscan_logo.png
   :width: 600
@@ -12,7 +9,7 @@
 Fast Multicore HDBSCAN
 ======================
 
-The ``fast_hdbscan`` library provides a simple implementation of the HDBSCAN clustering algorithm designed specifically
+Ahe ``fast_hdbscan`` library provides a simple implementation of the HDBSCAN clustering algorithm designed specifically
 for high performance on multicore machine with low dimensional data. The algorithm runs in parallel and can make
 effective use of as many cores as you wish to throw at a problem. It is thus ideal for large SMP systems, and even
 modern multicore laptops.
@@ -21,6 +18,7 @@ This library provides a
 re-implementation of a subset of the HDBSCAN algorithm that is compatible with the
 `hdbscan <https://github.com/scikit-learn-contrib/hdbscan>`_ library for data that is Euclidean and
 low dimensional. The primary advantages of this library over the standard ``hdbscan`` library are:
+
 
  * this library can easily use all available cores to speed up computation;
  * this library has much faster implementations of tree condensing and cluster extraction;
@@ -64,19 +62,15 @@ fast_hdbscan can be installed via pip:
 
     pip install fast-hdbscan
 
+To manually install this package:
 
-----------
-User Guide
-----------
+.. code:: bash
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   basic_usage
-   benchmarks
-   comparable_clusterings
-
+    wget https://github.com/TutteInstitute/fast_hdbscan/archive/main.zip
+    unzip main.zip
+    rm main.zip
+    cd fast_hdbscan-main
+    python setup.py install
 
 ----------
 References
@@ -93,9 +87,17 @@ The algorithm used here is an adaptation of the algorithms described in the pape
     In: Advances in Knowledge Discovery and Data Mining, Springer, pp 160-172.
     2013
 
-Indices and tables
-==================
+-------
+License
+-------
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+fast_hdbscan is BSD (2-clause) licensed. See the LICENSE file for details.
+
+------------
+Contributing
+------------
+
+Contributions are more than welcome! If you have ideas for features of projects please get in touch. Everything from
+code to notebooks to examples and documentation are all *equally valuable* so please don't feel you can't contribute.
+To contribute please `fork the project <https://github.com/TutteInstitute/fast_hdbscan/issues#fork-destination-box>`_ make your
+changes and submit a pull request. We will do our best to work through any issues with you and get your code merged in.

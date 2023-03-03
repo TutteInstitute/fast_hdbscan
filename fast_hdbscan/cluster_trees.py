@@ -271,6 +271,9 @@ def extract_eom_clusters(condensed_tree, allow_single_cluster=False):
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
     selected_clusters = {node: False for node in node_scores}
 
+    if len(cluster_tree.parent) == 0:
+        return np.zeros(0, dtype=np.int64)
+
     cluster_tree_root = cluster_tree.parent.min()
 
     if allow_single_cluster:

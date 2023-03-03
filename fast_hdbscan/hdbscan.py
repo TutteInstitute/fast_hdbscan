@@ -134,6 +134,16 @@ def fast_hdbscan(
     allow_single_cluster=False,
     return_trees=False,
 ):
+    data = check_array(data)
+
+    if (
+        (not (np.issubdtype(type(min_samples), np.integer) or min_samples is None))
+        or not np.issubdtype(type(min_cluster_size), np.integer)
+        or (min_samples is not None and min_samples <= 0)
+        or min_cluster_size <= 0
+    ):
+        raise ValueError("Min samples and min cluster size must be positive integers!")
+
     sklearn_tree = KDTree(data)
     numba_tree = kdtree_to_numba(sklearn_tree)
     edges = parallel_boruvka(
