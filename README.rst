@@ -60,7 +60,7 @@ fast_hdbscan can be installed via pip:
 
 .. code:: bash
 
-    pip install fast-hdbscan
+    pip install fast_hdbscan
 
 To manually install this package:
 
