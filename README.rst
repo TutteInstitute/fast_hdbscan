@@ -32,7 +32,7 @@ Basic Usage
 -----------
 
 The ``fast_hdbscan`` library follows the ``hdbscan`` library in using the sklearn API. You can use the ``fast_hdbscan``
-class ``HDBSCAN`` exactly as you wuld that of the ``hdbscan`` library with the caveat that ``fast_hdbscan`` only
+class ``HDBSCAN`` exactly as you would that of the ``hdbscan`` library with the caveat that ``fast_hdbscan`` only
 supports a subset of the parameters and options of ``hdbscan``. Nonetheless, if you have low-dimensional
 Euclidean data (e.g. the output of UMAP), you can use this library as a straightforward drop in replacement for
 ``hdbscan``:
