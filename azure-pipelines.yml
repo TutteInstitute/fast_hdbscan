@@ -4,63 +4,112 @@
 # https://docs.microsoft.com/azure/devops/pipelines/languages/python
 
 trigger:
-- main
+  branches:
+    include:
+    - main
+  tags:
+    include:
+    - release-*
 
-# Matrix needs to be manually built:
-# https://github.com/Microsoft/azure-pipelines-yaml/issues/20
-strategy:
-  matrix:
-    mac_py39:
-      imageName: 'macOS-latest'
-      python.version: '3.9'
-    linux_py39:
-      imageName: 'ubuntu-latest'
-      python.version: '3.9'
-    windows_py39:
-      imageName: 'windows-latest'
-      python.version: '3.9'
-    mac_py310:
-      imageName: 'macOS-latest'
-      python.version: '3.10'
-    linux_py310:
-      imageName: 'ubuntu-latest'
-      python.version: '3.10'
-    windows_py310:
-      imageName: 'windows-latest'
-      python.version: '3.10'
+stages:
+  - stage: RunAllTests
+    displayName: Run test suite
+    jobs:
+      - job: run_platform_tests
+        strategy:
+          matrix:
+            mac_py39:
+              imageName: 'macOS-latest'
+              python.version: '3.9'
+            linux_py39:
+              imageName: 'ubuntu-latest'
+              python.version: '3.9'
+            windows_py39:
+              imageName: 'windows-latest'
+              python.version: '3.9'
+            mac_py310:
+              imageName: 'macOS-latest'
+              python.version: '3.10'
+            linux_py310:
+              imageName: 'ubuntu-latest'
+              python.version: '3.10'
+            windows_py310:
+              imageName: 'windows-latest'
+              python.version: '3.10'
 
-pool:
-  vmImage: $(imageName)
+        pool:
+          vmImage: $(imageName)
 
-steps:
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '$(python.version)'
-  displayName: 'Use Python $(python.version)'
+        steps:
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '$(python.version)'
+          displayName: 'Use Python $(python.version)'
 
-- script: |
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
-  displayName: 'Install dependencies'
+        - script: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+          displayName: 'Install dependencies'
 
-- script: |
-    pip install -e .
-    pip install pytest  pytest-azurepipelines
-    pip install pytest-cov
-    pip install coveralls
-  displayName: 'Install package'
+        - script: |
+            pip install -e .
+            pip install pytest  pytest-azurepipelines
+            pip install pytest-cov
+            pip install coveralls
+          displayName: 'Install package'
 
-- script: |
-    pytest fast_hdbscan/tests --show-capture=no -v --disable-warnings --junitxml=junit/test-results.xml --cov=fast_hdbscan/ --cov-report=xml --cov-report=html
-  displayName: 'Run tests'
+        - script: |
+            pytest fast_hdbscan/tests --show-capture=no -v --disable-warnings --junitxml=junit/test-results.xml --cov=fast_hdbscan/ --cov-report=xml --cov-report=html
+          displayName: 'Run tests'
 
-- bash: |
-    export COVERALLS_REPO_TOKEN=$(COVERALLS_REPO_TOKEN)
-    coveralls
-  displayName: 'Publish to coveralls'
+        - bash: |
+            coveralls
+          displayName: 'Publish to coveralls'
+          env:
+            COVERALLS_REPO_TOKEN: $(COVERALLS_TOKEN)
 
-- task: PublishTestResults@2
-  inputs:
-    testResultsFiles: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
-    testRunTitle: '$(Agent.OS) - $(Build.BuildNumber)[$(Agent.JobName)] - Python $(python.version)'
-  condition: succeededOrFailed()
+        - task: PublishTestResults@2
+          inputs:
+            testResultsFiles: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+            testRunTitle: '$(Agent.OS) - $(Build.BuildNumber)[$(Agent.JobName)] - Python $(python.version)'
+          condition: succeededOrFailed()
+
+  - stage: BuildPublishArtifact
+    dependsOn: RunAllTests
+    condition: startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')
+    jobs:
+      - job: BuildArtifacts
+        displayName: Build source dists and wheels    
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '3.10'
+          displayName: 'Use Python 3.10'
+
+        - script: |
+            python -m pip install --upgrade pip
+            pip install wheel
+            pip install -r requirements.txt
+          displayName: 'Install dependencies'
+
+        - script: |
+            pip install -e .
+          displayName: 'Install package locally'
+        
+        - script: |
+            python setup.py sdist bdist_wheel
+          displayName: 'Build package'
+
+        - task: DownloadSecureFile@1
+          name: PYPIRC_CONFIG
+          displayName: 'Download pypirc'
+          inputs:
+            secureFile: 'pypirc'  
+
+        - script: |
+            pip install twine
+            twine upload --repository testpypi --config-file $(PYPIRC_CONFIG.secureFilePath) dist/* 
+          displayName: 'Upload to PyPI'
+
