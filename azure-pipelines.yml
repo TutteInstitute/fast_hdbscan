@@ -11,6 +11,14 @@ trigger:
     include:
     - release-*
 
+pr:
+  branches:
+    include:
+    - main
+    exclude:
+    - doc/*
+    - README.rst
+
 stages:
   - stage: RunAllTests
     displayName: Run test suite
