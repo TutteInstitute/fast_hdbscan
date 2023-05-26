@@ -3,7 +3,6 @@ trigger:
   branches:
     include:
     - main
-    - master
   tags:
     include:
     - release-*
@@ -14,7 +13,6 @@ pr:
   branches:
     include:
     - main
-    - master
     exclude:
     - doc/*
     - README.rst
