@@ -200,7 +200,7 @@ def condense_tree(hierarchy, min_cluster_size=10):
 
 @numba.njit()
 def extract_leaves(condensed_tree, allow_single_cluster=True):
-    n_nodes = condensed_tree.child.max() + 1
+    n_nodes = condensed_tree.parent.max() + 1
     n_points = condensed_tree.parent.min()
     leaf_indicator = np.ones(n_nodes, dtype=np.bool_)
     leaf_indicator[:n_points] = False
