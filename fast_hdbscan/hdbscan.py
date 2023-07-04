@@ -13,9 +13,11 @@ from .cluster_trees import (
     condense_tree,
     extract_eom_clusters,
     extract_leaves,
+    cluster_epsilon_search,
     get_cluster_labelling_at_cut,
     get_cluster_label_vector,
     get_point_membership_strength_vector,
+    cluster_tree_from_condensed_tree,
 )
 
 try:
@@ -132,6 +134,7 @@ def fast_hdbscan(
     min_cluster_size=10,
     cluster_selection_method="eom",
     allow_single_cluster=False,
+    cluster_selection_epsilon=0.0,
     return_trees=False,
 ):
     data = check_array(data)
@@ -143,6 +146,12 @@ def fast_hdbscan(
         or min_cluster_size <= 0
     ):
         raise ValueError("Min samples and min cluster size must be positive integers!")
+    
+    if (
+        not np.issubdtype(type(cluster_selection_epsilon), np.floating)
+        or cluster_selection_epsilon < 0.0
+    ):
+        raise ValueError('Cluster selection epsilon must be a positive floating point number!')
 
     sklearn_tree = KDTree(data)
     numba_tree = kdtree_to_numba(sklearn_tree)
@@ -152,10 +161,12 @@ def fast_hdbscan(
     sorted_mst = edges[np.argsort(edges.T[2])]
     linkage_tree = mst_to_linkage_tree(sorted_mst)
     condensed_tree = condense_tree(linkage_tree, min_cluster_size=min_cluster_size)
+    if cluster_selection_epsilon > 0.0 or cluster_selection_method == "eom":
+        cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 
     if cluster_selection_method == "eom":
         selected_clusters = extract_eom_clusters(
-            condensed_tree, allow_single_cluster=allow_single_cluster
+            condensed_tree, cluster_tree, allow_single_cluster=allow_single_cluster
         )
     elif cluster_selection_method == "leaf":
         selected_clusters = extract_leaves(
@@ -163,8 +174,14 @@ def fast_hdbscan(
         )
     else:
         raise ValueError(f"Invalid cluster_selection_method {cluster_selection_method}")
+    
+    if len(selected_clusters) > 1 and cluster_selection_epsilon > 0.0:
+        selected_clusters = cluster_epsilon_search(
+            selected_clusters, cluster_tree,
+            min_persistence=cluster_selection_epsilon,
+        )
 
-    clusters = get_cluster_label_vector(condensed_tree, selected_clusters)
+    clusters = get_cluster_label_vector(condensed_tree, selected_clusters, cluster_selection_epsilon)
     membership_strengths = get_point_membership_strength_vector(
         condensed_tree, selected_clusters, clusters
     )
@@ -182,12 +199,14 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         min_samples=None,
         cluster_selection_method="eom",
         allow_single_cluster=False,
+        cluster_selection_epsilon=0.0,
         **kwargs,
     ):
         self.min_cluster_size = min_cluster_size
         self.min_samples = min_samples
         self.cluster_selection_method = cluster_selection_method
         self.allow_single_cluster = allow_single_cluster
+        self.cluster_selection_epsilon = cluster_selection_epsilon
 
     def fit(self, X, y=None, **fit_params):
         X = check_array(X, accept_sparse="csr", force_all_finite=False)
