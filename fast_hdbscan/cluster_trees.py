@@ -200,7 +200,7 @@ def condense_tree(hierarchy, min_cluster_size=10):
 
 @numba.njit()
 def extract_leaves(condensed_tree, allow_single_cluster=True):
-    n_nodes = condensed_tree.child.max() + 1
+    n_nodes = condensed_tree.parent.max() + 1
     n_points = condensed_tree.parent.min()
     leaf_indicator = np.ones(n_nodes, dtype=np.bool_)
     leaf_indicator[:n_points] = False
@@ -266,9 +266,8 @@ def eom_recursion(node, cluster_tree, node_scores, selected_clusters):
 
 
 @numba.njit()
-def extract_eom_clusters(condensed_tree, allow_single_cluster=False):
+def extract_eom_clusters(condensed_tree, cluster_tree, allow_single_cluster=False):
     node_scores = score_condensed_tree_nodes(condensed_tree)
-    cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
     selected_clusters = {node: False for node in node_scores}
 
     if len(cluster_tree.parent) == 0:
@@ -284,6 +283,62 @@ def extract_eom_clusters(condensed_tree, allow_single_cluster=False):
             eom_recursion(child_node, cluster_tree, node_scores, selected_clusters)
 
     return np.asarray([node for node, selected in selected_clusters.items() if selected])
+
+
+@numba.njit()
+def cluster_epsilon_search(clusters, cluster_tree, min_persistence=0.0):
+    selected = list()
+    # only way to create a typed empty set
+    processed = {np.int64(0)}
+    processed.clear()
+
+    root = cluster_tree.parent.min()
+    for cluster in clusters:
+        eps = 1 / cluster_tree.lambda_val[cluster_tree.child == cluster][0]
+        if eps < min_persistence:
+            if cluster not in processed:
+                parent = traverse_upwards(cluster_tree, min_persistence, root, cluster)
+                selected.append(parent)
+                processed |= segments_in_branch(cluster_tree, parent)
+        else:
+            selected.append(cluster)
+    return np.asarray(selected)
+
+
+@numba.njit()
+def traverse_upwards(cluster_tree, min_persistence, root, segment):
+    parent = cluster_tree.parent[cluster_tree.child == segment][0]
+    if parent == root:
+        return root
+    parent_eps = 1 / cluster_tree.lambda_val[cluster_tree.child == parent][0]
+    if parent_eps >= min_persistence:
+        return parent
+    else:
+        return traverse_upwards(cluster_tree, min_persistence, root, parent)
+
+
+@numba.njit()
+def segments_in_branch(cluster_tree, segment):
+    # only way to create a typed empty set
+    result = {np.intp(0)}
+    result.clear()
+    to_process = {segment}
+
+    while len(to_process) > 0:
+        result |= to_process
+        to_process = set(cluster_tree.child[
+            in_set_parallel(cluster_tree.parent, to_process)
+        ])
+
+    return result
+
+
+@numba.njit(parallel=True)
+def in_set_parallel(values, targets):
+  mask = np.empty(values.shape[0], dtype=numba.boolean)
+  for i in numba.prange(values.shape[0]):
+    mask[i] = values[i] in targets
+  return mask
 
 
 @numba.njit(parallel=True)
@@ -327,6 +382,7 @@ def get_cluster_labelling_at_cut(linkage_tree, cut, min_cluster_size):
 def get_cluster_label_vector(
         tree,
         clusters,
+        cluster_selection_epsilon
 ):
     root_cluster = tree.parent.min()
     result = np.empty(root_cluster, dtype=np.intp)
@@ -348,7 +404,13 @@ def get_cluster_label_vector(
         elif cluster == root_cluster:
             if len(clusters) == 1:
                 max_lambda = tree.lambda_val[tree.parent == cluster].max()
-                if tree.lambda_val[tree.child == n] >= max_lambda:
+                cur_lambda = tree.lambda_val[tree.child == n]
+                if cluster_selection_epsilon > 0.0:
+                    if cur_lambda >= 1 / cluster_selection_epsilon:
+                        result[n] = cluster_label_map[cluster]
+                    else:
+                        result[n] = -1
+                elif cur_lambda >= max_lambda:
                     result[n] = cluster_label_map[cluster]
                 else:
                     result[n] = -1

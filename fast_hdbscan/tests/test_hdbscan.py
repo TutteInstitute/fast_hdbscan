@@ -131,6 +131,35 @@ def test_hdbscan_badargs():
     assert_raises(ValueError, fast_hdbscan, X, min_cluster_size="fail")
     assert_raises(ValueError, fast_hdbscan, X, min_samples="fail")
     assert_raises(ValueError, fast_hdbscan, X, min_samples=-1)
+    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon="fail")
+    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon=-1)
+    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon=-0.1)
+    assert_raises(
+        ValueError, fast_hdbscan, X, cluster_selection_method="fail"
+    )
+
+
+def test_fhdbscan_allow_single_cluster_with_epsilon():
+    np.random.seed(0)
+    no_structure = np.random.rand(150, 2)
+    # without epsilon we should see 65 noise points and 9 labels
+    c = HDBSCAN(
+        min_cluster_size=5,
+        cluster_selection_epsilon=0.0,
+    ).fit(no_structure)
+    unique_labels, counts = np.unique(c.labels_, return_counts=True)
+    assert len(unique_labels) == 9
+    assert counts[unique_labels == -1] == 65
+
+    # An epsilon of 0.2 will produce 2 noise points and 2 labels
+    # Allow single cluster does not prevent applying the epsilon threshold.
+    c = HDBSCAN(
+        min_cluster_size=5,
+        cluster_selection_epsilon=0.2
+    ).fit(no_structure)
+    unique_labels, counts = np.unique(c.labels_, return_counts=True)
+    assert len(unique_labels) == 2
+    assert counts[unique_labels == -1] == 2
 
 
 # Disable for now -- need to refactor to meet newer standards
