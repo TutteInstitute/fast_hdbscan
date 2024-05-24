@@ -2,6 +2,7 @@ import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_array
+from sklearn.utils.validation import check_is_fitted, _check_sample_weight
 from sklearn.neighbors import KDTree
 
 from warnings import warn
@@ -135,6 +136,7 @@ def fast_hdbscan(
     cluster_selection_method="eom",
     allow_single_cluster=False,
     cluster_selection_epsilon=0.0,
+    sample_weights=None,
     return_trees=False,
 ):
     data = check_array(data)
@@ -156,10 +158,10 @@ def fast_hdbscan(
     sklearn_tree = KDTree(data)
     numba_tree = kdtree_to_numba(sklearn_tree)
     edges = parallel_boruvka(
-        numba_tree, min_samples=min_cluster_size if min_samples is None else min_samples
+        numba_tree, min_samples=min_cluster_size if min_samples is None else min_samples, sample_weights=sample_weights
     )
     sorted_mst = edges[np.argsort(edges.T[2])]
-    linkage_tree = mst_to_linkage_tree(sorted_mst)
+    linkage_tree = mst_to_linkage_tree(sorted_mst, sample_weights=sample_weights)
     condensed_tree = condense_tree(linkage_tree, min_cluster_size=min_cluster_size)
     if cluster_selection_epsilon > 0.0 or cluster_selection_method == "eom":
         cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
@@ -208,8 +210,10 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         self.allow_single_cluster = allow_single_cluster
         self.cluster_selection_epsilon = cluster_selection_epsilon
 
-    def fit(self, X, y=None, **fit_params):
+    def fit(self, X, y=None, sample_weight=None, **fit_params):
         X = check_array(X, accept_sparse="csr", force_all_finite=False)
+        if sample_weight is not None:
+            sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
         self._raw_data = X
 
         self._all_finite = np.all(np.isfinite(X))
@@ -233,7 +237,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             self._single_linkage_tree,
             self._condensed_tree,
             self._min_spanning_tree,
-        ) = fast_hdbscan(clean_data, return_trees=True, **kwargs)
+        ) = fast_hdbscan(clean_data, return_trees=True, sample_weights=sample_weight, **kwargs)
 
         self._condensed_tree = to_numpy_rec_array(self._condensed_tree)
 
@@ -256,6 +260,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         return self
 
     def dbscan_clustering(self, epsilon):
+        check_is_fitted(self, "_single_linkage_tree", msg="You first need to fit the HDBSCAN model before picking a DBSCAN clustering")
         return get_cluster_labelling_at_cut(
             self._single_linkage_tree,
             epsilon,
@@ -264,6 +269,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
 
     @property
     def condensed_tree_(self):
+        check_is_fitted(self, "_condensed_tree", msg="You first need to fit the HDBSCAN model before accessing the condensed tree")
         if self._condensed_tree is not None:
             return CondensedTree(
                 self._condensed_tree,
@@ -277,6 +283,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
 
     @property
     def single_linkage_tree_(self):
+        check_is_fitted(self, "_single_linkage_tree", msg="You first need to fit the HDBSCAN model before accessing the single linkage tree")
         if self._single_linkage_tree is not None:
             return SingleLinkageTree(self._single_linkage_tree)
         else:
@@ -286,6 +293,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
 
     @property
     def minimum_spanning_tree_(self):
+        check_is_fitted(self, "_min_spanning_tree", msg="You first need to fit the HDBSCAN model before accessing the minimum spanning tree")
         if self._min_spanning_tree is not None:
             if self._raw_data is not None:
                 return MinimumSpanningTree(self._min_spanning_tree, self._raw_data)

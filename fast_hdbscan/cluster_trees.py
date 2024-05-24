@@ -18,6 +18,16 @@ def create_linkage_merge_data(base_size):
 
 
 @numba.njit()
+def create_linkage_merge_data_w_sample_weights(sample_weights):
+    base_size = sample_weights.shape[0]
+    parent = np.full(2 * base_size - 1, -1, dtype=np.intp)
+    size = np.concatenate((sample_weights, np.zeros(base_size - 1, dtype=np.float32)))
+    next_parent = np.array([base_size], dtype=np.intp)
+
+    return LinkageMergeData(parent, size, next_parent)
+
+
+@numba.njit()
 def linkage_merge_find(linkage_merge, node):
     relabel = node
     while linkage_merge.parent[node] != -1 and linkage_merge.parent[node] != node:
@@ -43,11 +53,14 @@ def linkage_merge_join(linkage_merge, left, right):
 
 
 @numba.njit()
-def mst_to_linkage_tree(sorted_mst):
+def mst_to_linkage_tree(sorted_mst, sample_weights=None):
     result = np.empty((sorted_mst.shape[0], sorted_mst.shape[1] + 1))
 
     n_samples = sorted_mst.shape[0] + 1
-    linkage_merge = create_linkage_merge_data(n_samples)
+    if sample_weights is None:
+        linkage_merge = create_linkage_merge_data(n_samples)
+    else:
+        linkage_merge = create_linkage_merge_data_w_sample_weights(sample_weights)
 
     for index in range(sorted_mst.shape[0]):
 
@@ -116,7 +129,7 @@ CondensedTree = namedtuple('CondensedTree', ['parent', 'child', 'lambda_val', 'c
 
 
 @numba.njit(fastmath=True)
-def condense_tree(hierarchy, min_cluster_size=10):
+def condense_tree(hierarchy, min_cluster_size=10, sample_weights=None):
     root = 2 * hierarchy.shape[0]
     num_points = hierarchy.shape[0] + 1
     next_label = num_points + 1
@@ -133,6 +146,9 @@ def condense_tree(hierarchy, min_cluster_size=10):
 
     ignore = np.zeros(root + 1, dtype=np.bool8)
 
+    if sample_weights is None:
+        sample_weights = np.ones(num_points, dtype=np.float32)
+
     idx = 0
 
     for node in node_list:
@@ -148,8 +164,8 @@ def condense_tree(hierarchy, min_cluster_size=10):
         else:
             lambda_value = np.inf
 
-        left_count = np.int64(hierarchy[left - num_points, 3]) if left >= num_points else 1
-        right_count = np.int64(hierarchy[right - num_points, 3]) if right >= num_points else 1
+        left_count = np.int64(hierarchy[left - num_points, 3]) if left >= num_points else sample_weights[left]
+        right_count = np.int64(hierarchy[right - num_points, 3]) if right >= num_points else sample_weights[left]
 
         # The logic here is in a strange order, but it has non-trivial performance gains ...
         # The most common case by far is a singleton on the left; and cluster on the right take care of this separately
