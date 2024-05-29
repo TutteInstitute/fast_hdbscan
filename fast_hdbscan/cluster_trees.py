@@ -53,14 +53,41 @@ def linkage_merge_join(linkage_merge, left, right):
 
 
 @numba.njit()
-def mst_to_linkage_tree(sorted_mst, sample_weights=None):
+def mst_to_linkage_tree(sorted_mst):
     result = np.empty((sorted_mst.shape[0], sorted_mst.shape[1] + 1))
 
     n_samples = sorted_mst.shape[0] + 1
-    if sample_weights is None:
-        linkage_merge = create_linkage_merge_data(n_samples)
-    else:
-        linkage_merge = create_linkage_merge_data_w_sample_weights(sample_weights)
+    linkage_merge = create_linkage_merge_data(n_samples)
+
+    for index in range(sorted_mst.shape[0]):
+
+        left = np.intp(sorted_mst[index, 0])
+        right = np.intp(sorted_mst[index, 1])
+        delta = sorted_mst[index, 2]
+
+        left_component = linkage_merge_find(linkage_merge, left)
+        right_component = linkage_merge_find(linkage_merge, right)
+
+        if left_component > right_component:
+            result[index][0] = left_component
+            result[index][1] = right_component
+        else:
+            result[index][1] = left_component
+            result[index][0] = right_component
+
+        result[index][2] = delta
+        result[index][3] = linkage_merge.size[left_component] + linkage_merge.size[right_component]
+
+        linkage_merge_join(linkage_merge, left_component, right_component)
+
+    return result
+
+
+@numba.njit()
+def mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights):
+    result = np.empty((sorted_mst.shape[0], sorted_mst.shape[1] + 1))
+
+    linkage_merge = create_linkage_merge_data_w_sample_weights(sample_weights)
 
     for index in range(sorted_mst.shape[0]):
 

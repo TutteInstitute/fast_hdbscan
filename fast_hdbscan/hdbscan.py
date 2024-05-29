@@ -11,6 +11,7 @@ from .numba_kdtree import kdtree_to_numba
 from .boruvka import parallel_boruvka
 from .cluster_trees import (
     mst_to_linkage_tree,
+    mst_to_linkage_tree_w_sample_weights,
     condense_tree,
     extract_eom_clusters,
     extract_leaves,
@@ -161,7 +162,10 @@ def fast_hdbscan(
         numba_tree, min_samples=min_cluster_size if min_samples is None else min_samples, sample_weights=sample_weights
     )
     sorted_mst = edges[np.argsort(edges.T[2])]
-    linkage_tree = mst_to_linkage_tree(sorted_mst, sample_weights=sample_weights)
+    if sample_weights is None:
+        linkage_tree = mst_to_linkage_tree(sorted_mst)
+    else:
+        linkage_tree = mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights)
     condensed_tree = condense_tree(linkage_tree, min_cluster_size=min_cluster_size)
     if cluster_selection_epsilon > 0.0 or cluster_selection_method == "eom":
         cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
