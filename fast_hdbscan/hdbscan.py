@@ -1,7 +1,7 @@
 import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.utils import check_array
+from sklearn.utils import check_array, check_X_y
 from sklearn.neighbors import KDTree
 
 from warnings import warn
@@ -18,6 +18,7 @@ from .cluster_trees import (
     get_cluster_label_vector,
     get_point_membership_strength_vector,
     cluster_tree_from_condensed_tree,
+    extract_clusters_bcubed
 )
 
 try:
@@ -26,6 +27,8 @@ try:
     _HAVE_HDBSCAN = True
 except ImportError:
     _HAVE_HDBSCAN = False
+
+from numba.typed import Dict
 
 
 def to_numpy_rec_array(named_tuple_tree):
@@ -130,6 +133,9 @@ def remap_single_linkage_tree(tree, internal_to_raw, outliers):
 
 def fast_hdbscan(
     data,
+    data_labels,
+    semi_supervised=False,
+    ss_algorithm=None,
     min_samples=10,
     min_cluster_size=10,
     cluster_selection_method="eom",
@@ -138,6 +144,13 @@ def fast_hdbscan(
     return_trees=False,
 ):
     data = check_array(data)
+
+    if semi_supervised:
+        label_indices = np.flatnonzero(data_labels > -1)
+        label_values = data_labels[label_indices]
+        data_labels_dict = Dict()
+        for index, label in zip(label_indices, label_values):
+            data_labels_dict[index] = label 
 
     if (
         (not (np.issubdtype(type(min_samples), np.integer) or min_samples is None))
@@ -165,9 +178,25 @@ def fast_hdbscan(
         cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 
     if cluster_selection_method == "eom":
-        selected_clusters = extract_eom_clusters(
-            condensed_tree, cluster_tree, allow_single_cluster=allow_single_cluster
-        )
+            if semi_supervised:
+                    if(ss_algorithm=="bc"):
+                        selected_clusters = extract_clusters_bcubed(condensed_tree, 
+                                                                    cluster_tree, 
+                                                                    data_labels_dict, 
+                                                                    allow_virtual_nodes=True, 
+                                                                    allow_single_cluster=allow_single_cluster)
+                    elif(ss_algorithm=="bc_without_vn"):
+                        selected_clusters = extract_clusters_bcubed(condensed_tree, 
+                                                                    cluster_tree, 
+                                                                    data_labels_dict, 
+                                                                    allow_virtual_nodes=False, 
+                                                                    allow_single_cluster=allow_single_cluster)
+                    else:
+                        raise ValueError(f"Invalid ss_algorithm {ss_algorithm}")
+            else:  
+                selected_clusters = extract_eom_clusters(condensed_tree, 
+                                                        cluster_tree, 
+                                                        allow_single_cluster=allow_single_cluster)  
     elif cluster_selection_method == "leaf":
         selected_clusters = extract_leaves(
             condensed_tree, allow_single_cluster=allow_single_cluster
@@ -200,6 +229,8 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         cluster_selection_method="eom",
         allow_single_cluster=False,
         cluster_selection_epsilon=0.0,
+        semi_supervised=False,
+        ss_algorithm=None,
         **kwargs,
     ):
         self.min_cluster_size = min_cluster_size
@@ -207,10 +238,22 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         self.cluster_selection_method = cluster_selection_method
         self.allow_single_cluster = allow_single_cluster
         self.cluster_selection_epsilon = cluster_selection_epsilon
+        self.semi_supervised = semi_supervised
+        self.ss_algorithm = ss_algorithm
 
     def fit(self, X, y=None, **fit_params):
-        X = check_array(X, accept_sparse="csr", force_all_finite=False)
-        self._raw_data = X
+
+        if (self.semi_supervised):
+            X, y = check_X_y(X, y, accept_sparse="csr", force_all_finite=False)
+            self._raw_labels = y
+            # Replace non-finite labels with -1 labels
+            y[~np.isfinite(y)] = -1
+
+            if ~np.any(y !=-1):
+                raise ValueError("y must contain at least one label > -1. Currently it only contains -1 and/or non-finite labels!")
+        else:
+            X = check_array(X, accept_sparse="csr", force_all_finite=False)
+            self._raw_data = X
 
         self._all_finite = np.all(np.isfinite(X))
         if ~self._all_finite:
@@ -218,12 +261,17 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             # We will later assign all non-finite points to the background -1 cluster
             finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
             clean_data = X[finite_index]
+
+            if self.semi_supervised:
+                clean_data_labels = y[finite_index]
+
             internal_to_raw = {
                 x: y for x, y in zip(range(len(finite_index)), finite_index)
             }
             outliers = list(set(range(X.shape[0])) - set(finite_index))
         else:
             clean_data = X
+            clean_data_labels = y
 
         kwargs = self.get_params()
 
@@ -233,7 +281,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             self._single_linkage_tree,
             self._condensed_tree,
             self._min_spanning_tree,
-        ) = fast_hdbscan(clean_data, return_trees=True, **kwargs)
+        ) = fast_hdbscan(clean_data, clean_data_labels, return_trees=True, **kwargs)
 
         self._condensed_tree = to_numpy_rec_array(self._condensed_tree)
 
