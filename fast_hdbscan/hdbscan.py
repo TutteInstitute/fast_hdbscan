@@ -133,7 +133,7 @@ def remap_single_linkage_tree(tree, internal_to_raw, outliers):
 
 def fast_hdbscan(
     data,
-    data_labels,
+    data_labels=None,
     semi_supervised=False,
     ss_algorithm=None,
     min_samples=10,
@@ -144,6 +144,9 @@ def fast_hdbscan(
     return_trees=False,
 ):
     data = check_array(data)
+
+    if semi_supervised and data_labels is None:
+        raise ValueError("data_labels must not be None when semi_supervised is set to True!") 
 
     if semi_supervised:
         label_indices = np.flatnonzero(data_labels > -1)
@@ -261,7 +264,8 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             # We will later assign all non-finite points to the background -1 cluster
             finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
             clean_data = X[finite_index]
-
+            clean_data_labels = y
+            
             if self.semi_supervised:
                 clean_data_labels = y[finite_index]
 
