@@ -188,7 +188,7 @@ def fast_hdbscan(
         linkage_tree = mst_to_linkage_tree(sorted_mst)
     else:
         linkage_tree = mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights)
-    condensed_tree = condense_tree(linkage_tree, min_cluster_size=min_cluster_size)
+    condensed_tree = condense_tree(linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights)
     if cluster_selection_epsilon > 0.0 or cluster_selection_method == "eom":
         cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 

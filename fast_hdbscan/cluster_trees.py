@@ -197,7 +197,7 @@ def condense_tree(hierarchy, min_cluster_size=10, sample_weights=None):
             lambda_value = np.inf
 
         left_count = np.float32(hierarchy[left - num_points, 3]) if left >= num_points else sample_weights[left]
-        right_count = np.float32(hierarchy[right - num_points, 3]) if right >= num_points else sample_weights[left]
+        right_count = np.float32(hierarchy[right - num_points, 3]) if right >= num_points else sample_weights[right]
 
         # The logic here is in a strange order, but it has non-trivial performance gains ...
         # The most common case by far is a singleton on the left; and cluster on the right take care of this separately
