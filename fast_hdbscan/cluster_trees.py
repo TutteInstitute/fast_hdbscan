@@ -174,7 +174,7 @@ def condense_tree(hierarchy, min_cluster_size=10, sample_weights=None):
     parents = np.ones(root, dtype=np.int64)
     children = np.empty(root, dtype=np.int64)
     lambdas = np.empty(root, dtype=np.float32)
-    sizes = np.ones(root, dtype=np.int64)
+    sizes = np.ones(root, dtype=np.float32)
 
     ignore = np.zeros(root + 1, dtype=np.bool_) # 'bool' is no longer an attribute of 'numpy'
 
@@ -196,8 +196,8 @@ def condense_tree(hierarchy, min_cluster_size=10, sample_weights=None):
         else:
             lambda_value = np.inf
 
-        left_count = np.int64(hierarchy[left - num_points, 3]) if left >= num_points else sample_weights[left]
-        right_count = np.int64(hierarchy[right - num_points, 3]) if right >= num_points else sample_weights[left]
+        left_count = np.float32(hierarchy[left - num_points, 3]) if left >= num_points else sample_weights[left]
+        right_count = np.float32(hierarchy[right - num_points, 3]) if right >= num_points else sample_weights[left]
 
         # The logic here is in a strange order, but it has non-trivial performance gains ...
         # The most common case by far is a singleton on the left; and cluster on the right take care of this separately
@@ -434,7 +434,7 @@ def extract_clusters_bcubed(condensed_tree, cluster_tree, label_indices, allow_v
 
 @numba.njit()
 def score_condensed_tree_nodes(condensed_tree):
-    result = {0: 0.0 for i in range(0)}
+    result = {0: np.float32(0.0) for i in range(0)}
 
     for i in range(condensed_tree.parent.shape[0]):
         parent = condensed_tree.parent[i]
@@ -602,13 +602,16 @@ def get_cluster_labelling_at_cut(linkage_tree, cut, min_cluster_size):
 def get_cluster_label_vector(
         tree,
         clusters,
-        cluster_selection_epsilon
+        cluster_selection_epsilon,
+        n_samples,
 ):
+    if len(tree.parent) == 0:
+        return np.full(n_samples, -1, dtype=np.intp)
     root_cluster = tree.parent.min()
-    result = np.empty(root_cluster, dtype=np.intp)
+    result = np.full(n_samples, -1, dtype=np.intp)
     cluster_label_map = {c: n for n, c in enumerate(np.sort(clusters))}
 
-    disjoint_set = ds_rank_create(tree.parent.max() + 1)
+    disjoint_set = ds_rank_create(max(tree.parent.max() + 1, tree.child.max() + 1))
     clusters = set(clusters)
 
     for n in range(tree.parent.shape[0]):
