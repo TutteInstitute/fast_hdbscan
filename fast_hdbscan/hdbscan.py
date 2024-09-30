@@ -250,7 +250,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
 
-    def fit(self, X, y=None, **fit_params):
+    def fit(self, X, y=None, sample_weight=None, **fit_params):
 
         if (self.semi_supervised):
             X, y = check_X_y(X, y, accept_sparse="csr", force_all_finite=False)
