@@ -247,22 +247,44 @@ def initialize_boruvka_from_knn(knn_indices, knn_distances, core_distances, disj
     return result[:result_idx]
 
 
-def parallel_boruvka(tree, min_samples=10):
+@numba.njit(parallel=True)
+def sample_weight_core_distance(distances, neighbors, sample_weights, min_samples):
+    core_distances = np.zeros(distances.shape[0], dtype=np.float32)
+    for i in numba.prange(distances.shape[0]):
+        total_weight = 0.0
+        j = 0
+        while total_weight < min_samples and j < neighbors.shape[1]:
+            total_weight += sample_weights[neighbors[i, j]]
+            j += 1
+
+        core_distances[i] = distances[i, j - 1]
+
+    return core_distances
+
+def parallel_boruvka(tree, min_samples=10, sample_weights=None):
     components_disjoint_set = ds_rank_create(tree.data.shape[0])
     point_components = np.arange(tree.data.shape[0])
     node_components = np.full(tree.node_data.shape[0], -1)
     n_components = point_components.shape[0]
 
-    if min_samples > 1:
-        distances, neighbors = parallel_tree_query(tree, tree.data, k=min_samples + 1, output_rdist=True)
-        core_distances = distances.T[-1]
+    if sample_weights is not None:
+        mean_sample_weight = np.mean(sample_weights)
+        expected_neighbors = min_samples / mean_sample_weight
+        distances, neighbors = parallel_tree_query(tree, tree.data, k=int(2 * expected_neighbors))
+        core_distances = sample_weight_core_distance(distances, neighbors, sample_weights, min_samples)
         edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
         update_component_vectors(tree, components_disjoint_set, node_components, point_components)
     else:
-        core_distances = np.zeros(tree.data.shape[0], dtype=np.float32)
-        distances, neighbors = parallel_tree_query(tree, tree.data, k=2)
-        edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
-        update_component_vectors(tree, components_disjoint_set, node_components, point_components)
+        if min_samples > 1:
+            distances, neighbors = parallel_tree_query(tree, tree.data, k=min_samples + 1, output_rdist=True)
+            core_distances = distances.T[-1]
+            edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
+            update_component_vectors(tree, components_disjoint_set, node_components, point_components)
+        else:
+            core_distances = np.zeros(tree.data.shape[0], dtype=np.float32)
+            distances, neighbors = parallel_tree_query(tree, tree.data, k=2)
+            edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
+            update_component_vectors(tree, components_disjoint_set, node_components, point_components)
 
     while n_components > 1:
         candidate_distances, candidate_indices = boruvka_tree_query(tree, node_components, point_components,

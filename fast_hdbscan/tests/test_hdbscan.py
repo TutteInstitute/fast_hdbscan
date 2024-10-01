@@ -104,6 +104,12 @@ def test_hdbscan_no_clusters():
     n_clusters_2 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_2 == 0
 
+def test_hdbscan_sample_weight():
+    sample_weight = y.astype(np.float32)
+    labels, p = fast_hdbscan(X, sample_weights=sample_weight)
+    n_clusters_1 = len(set(labels)) - int(-1 in labels)
+    assert n_clusters_1 == n_clusters - 1
+
 
 def test_hdbscan_min_cluster_size():
     for min_cluster_size in range(2, len(X) + 1, 1):
@@ -142,7 +148,7 @@ def test_hdbscan_badargs():
 def test_fhdbscan_allow_single_cluster_with_epsilon():
     np.random.seed(0)
     no_structure = np.random.rand(150, 2)
-    # without epsilon we should see 65 noise points and 9 labels
+    # without epsilon we should see 68 noise points and 9 labels
     c = HDBSCAN(
         min_cluster_size=5,
         cluster_selection_epsilon=0.0,
