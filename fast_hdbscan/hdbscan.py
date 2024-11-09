@@ -202,7 +202,7 @@ def fast_hdbscan(
                     allow_virtual_nodes=True,
                     allow_single_cluster=allow_single_cluster,
                 )
-            elif ss_algorithm == "bc_without_vn":
+            elif ss_algorithm == "bc_simple":
                 selected_clusters = extract_clusters_bcubed(
                     condensed_tree,
                     cluster_tree,
