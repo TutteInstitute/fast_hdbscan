@@ -10,7 +10,6 @@ from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils._testing import (
     assert_array_equal,
     assert_array_almost_equal,
-    assert_raises,
 )
 from fast_hdbscan import (
     HDBSCAN,
