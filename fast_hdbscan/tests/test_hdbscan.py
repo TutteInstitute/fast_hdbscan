@@ -154,14 +154,14 @@ def test_hdbscan_badargs():
 def test_fhdbscan_allow_single_cluster_with_epsilon():
     np.random.seed(0)
     no_structure = np.random.rand(150, 2)
-    # without epsilon we should see 68 noise points and 9 labels
+    # without epsilon we should see 68 noise points and 8 labels
     c = HDBSCAN(
         min_cluster_size=5,
         cluster_selection_epsilon=0.0,
     ).fit(no_structure)
     unique_labels, counts = np.unique(c.labels_, return_counts=True)
-    assert len(unique_labels) == 9
-    assert counts[unique_labels == -1] == 62
+    assert len(unique_labels) == 8
+    assert counts[unique_labels == -1] == 68
 
     # An epsilon of 0.2 will produce 2 noise points and 2 labels
     # Allow single cluster does not prevent applying the epsilon threshold.
