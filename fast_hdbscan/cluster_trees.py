@@ -474,14 +474,14 @@ def cluster_tree_from_condensed_tree(condensed_tree):
                          condensed_tree.child_size[mask])
 
 
-#@numba.njit()
+@numba.njit()
 def unselect_below_node(node, cluster_tree, selected_clusters):
     for child in cluster_tree.child[cluster_tree.parent == node]:
         unselect_below_node(child, cluster_tree, selected_clusters)
         selected_clusters[child] = False
 
 
-#@numba.njit(fastmath=True)
+@numba.njit(fastmath=True)
 def eom_recursion(node, cluster_tree, node_scores, node_sizes, selected_clusters, max_cluster_size):
     current_score = node_scores[node]
     current_size = node_sizes[node]
@@ -500,11 +500,14 @@ def eom_recursion(node, cluster_tree, node_scores, node_sizes, selected_clusters
         return current_score
 
 
-#@numba.njit()
+@numba.njit()
 def extract_eom_clusters(condensed_tree, cluster_tree, max_cluster_size=np.inf, allow_single_cluster=False):
     node_scores = score_condensed_tree_nodes(condensed_tree)
-    node_sizes = {node: size for node, size in zip(cluster_tree.child, cluster_tree.child_size.astype(np.float32))}
-    node_sizes[cluster_tree.parent.min()] = np.float32(cluster_tree.parent.min() - 1)
+    if len(cluster_tree.parent) > 0:
+        node_sizes = {node: size for node, size in zip(cluster_tree.child, cluster_tree.child_size.astype(np.float32))}
+        node_sizes[cluster_tree.parent.min()] = np.float32(cluster_tree.parent.min() - 1)
+    else:
+        node_sizes = {-1: np.float32(0.0)}
     selected_clusters = {node: False for node in node_scores}
 
     if len(cluster_tree.parent) == 0:

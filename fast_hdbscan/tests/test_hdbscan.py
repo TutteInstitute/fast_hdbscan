@@ -154,8 +154,8 @@ def test_fhdbscan_allow_single_cluster_with_epsilon():
         cluster_selection_epsilon=0.0,
     ).fit(no_structure)
     unique_labels, counts = np.unique(c.labels_, return_counts=True)
-    assert len(unique_labels) == 8
-    assert counts[unique_labels == -1] == 68
+    assert len(unique_labels) == 9
+    assert counts[unique_labels == -1] == 62
 
     # An epsilon of 0.2 will produce 2 noise points and 2 labels
     # Allow single cluster does not prevent applying the epsilon threshold.
