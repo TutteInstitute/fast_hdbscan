@@ -167,6 +167,13 @@ def test_fhdbscan_allow_single_cluster_with_epsilon():
     assert len(unique_labels) == 2
     assert counts[unique_labels == -1] == 2
 
+def test_fhdbscan_max_cluster_size():
+    model = HDBSCAN(max_cluster_size=30).fit(X)
+    assert len(set(model.labels_)) >= 3
+    for label in set(model.labels_):
+        if label != -1:
+            assert np.sum(model.labels_ == label) <= 30
+
 
 # Disable for now -- need to refactor to meet newer standards
 @pytest.mark.skip(reason="need to refactor to meet newer standards")
