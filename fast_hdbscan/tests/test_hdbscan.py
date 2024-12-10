@@ -132,17 +132,24 @@ def test_hdbscan_input_lists():
 
 
 def test_hdbscan_badargs():
-    assert_raises(ValueError, fast_hdbscan, "fail")
-    assert_raises(ValueError, fast_hdbscan, None)
-    assert_raises(ValueError, fast_hdbscan, X, min_cluster_size="fail")
-    assert_raises(ValueError, fast_hdbscan, X, min_samples="fail")
-    assert_raises(ValueError, fast_hdbscan, X, min_samples=-1)
-    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon="fail")
-    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon=-1)
-    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon=-0.1)
-    assert_raises(
-        ValueError, fast_hdbscan, X, cluster_selection_method="fail"
-    )
+    with pytest.raises(ValueError): 
+        fast_hdbscan("fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(None)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, min_cluster_size="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, min_samples="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, min_samples=-1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_epsilon="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_epsilon=-1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_epsilon=-0.1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_method="fail")
 
 
 def test_fhdbscan_allow_single_cluster_with_epsilon():
