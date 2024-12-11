@@ -141,6 +141,7 @@ def fast_hdbscan(
     min_samples=10,
     min_cluster_size=10,
     cluster_selection_method="eom",
+    max_cluster_size=np.inf,
     allow_single_cluster=False,
     cluster_selection_epsilon=0.0,
     sample_weights=None,
@@ -214,7 +215,7 @@ def fast_hdbscan(
                 raise ValueError(f"Invalid ss_algorithm {ss_algorithm}")
         else:
             selected_clusters = extract_eom_clusters(
-                condensed_tree, cluster_tree, allow_single_cluster=allow_single_cluster
+                condensed_tree, cluster_tree, max_cluster_size=max_cluster_size, allow_single_cluster=allow_single_cluster
             )
     elif cluster_selection_method == "leaf":
         selected_clusters = extract_leaves(
@@ -253,6 +254,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         min_samples=None,
         cluster_selection_method="eom",
         allow_single_cluster=False,
+        max_cluster_size=np.inf,
         cluster_selection_epsilon=0.0,
         semi_supervised=False,
         ss_algorithm=None,
@@ -262,6 +264,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         self.min_samples = min_samples
         self.cluster_selection_method = cluster_selection_method
         self.allow_single_cluster = allow_single_cluster
+        self.max_cluster_size = max_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
