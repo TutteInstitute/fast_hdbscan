@@ -15,6 +15,7 @@ from fast_hdbscan import (
     HDBSCAN,
     fast_hdbscan,
 )
+from fast_hdbscan.hdbscan import fast_hdbscan_mst_edges
 
 # from sklearn.cluster.tests.common import generate_clustered_data
 from sklearn.datasets import make_blobs
@@ -149,9 +150,13 @@ def test_hdbscan_badargs():
         fast_hdbscan(X, cluster_selection_epsilon=-0.1)
     with pytest.raises(ValueError): 
         fast_hdbscan(X, cluster_selection_method="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, semi_supervised=True, ss_algorithm="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, semi_supervised=True, data_labels=None)
 
 
-def test_fhdbscan_allow_single_cluster_with_epsilon():
+def test_hdbscan_allow_single_cluster_with_epsilon():
     np.random.seed(0)
     no_structure = np.random.rand(150, 2)
     # without epsilon we should see 68 noise points and 8 labels
@@ -173,12 +178,32 @@ def test_fhdbscan_allow_single_cluster_with_epsilon():
     assert len(unique_labels) == 2
     assert counts[unique_labels == -1] == 2
 
-def test_fhdbscan_max_cluster_size():
+def test_hdbscan_max_cluster_size():
     model = HDBSCAN(max_cluster_size=30).fit(X)
     assert len(set(model.labels_)) >= 3
     for label in set(model.labels_):
         if label != -1:
             assert np.sum(model.labels_ == label) <= 30
+
+
+def test_mst_entry():
+    # Assumes default keyword arguments match between class and function
+    model = HDBSCAN(min_cluster_size=5).fit(X)
+    (
+        labels, 
+        probabilities, 
+        linkage_tree, 
+        condensed_tree, 
+        sorted_mst
+    ) = fast_hdbscan_mst_edges(model._min_spanning_tree, min_cluster_size=5)
+    assert np.all(model.labels_ == labels)
+    assert np.allclose(model.probabilities_, probabilities)
+    assert np.allclose(model._min_spanning_tree, sorted_mst)
+    assert np.allclose(model._single_linkage_tree, linkage_tree)
+    assert np.allclose(model._condensed_tree['parent'], condensed_tree.parent)
+    assert np.allclose(model._condensed_tree['child'], condensed_tree.child)
+    assert np.allclose(model._condensed_tree['lambda_val'], condensed_tree.lambda_val)
+    assert np.allclose(model._condensed_tree['child_size'], condensed_tree.child_size)
 
 
 # Disable for now -- need to refactor to meet newer standards

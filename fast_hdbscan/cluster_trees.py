@@ -409,7 +409,10 @@ def unselect_below_node_bcubed(node, cluster_tree, selected_clusters, unselected
             unselected_nodes[child] = True
 
 @numba.njit()
-def extract_clusters_bcubed(condensed_tree, cluster_tree, label_indices, allow_virtual_nodes=False, allow_single_cluster=False):
+def extract_clusters_bcubed(condensed_tree, cluster_tree, data_labels, allow_virtual_nodes=False, allow_single_cluster=False):
+    label_indices = Dict()
+    for index in np.flatnonzero(data_labels > -1):
+        label_indices[index] = data_labels[index]
 
     if allow_virtual_nodes:
 
