@@ -88,8 +88,12 @@ def test_selection_method():
 def test_label_propagation():
     b = SubClusterDetector(lens_values=centrality).fit(c)
     check_detected_groups(b, n_clusters=2, n_subs=7)
-    b.labels_, b.sub_cluster_labels_ = b.propagated_labels()
-    assert np.all(b.sub_cluster_labels_ >= 0)
+    prev_sub_labels = b.sub_cluster_labels_.copy()
+    labels_, sub_cluster_labels_ = b.propagated_labels()
+    assert np.all(b.sub_cluster_labels_ == prev_sub_labels)
+    assert np.all(sub_cluster_labels_ >= 0)
+    b.labels_ = labels_
+    b.sub_cluster_labels_ = sub_cluster_labels_
     check_detected_groups(b, n_clusters=2, n_subs=5)
 
     b = SubClusterDetector(lens_values=centrality, propagate_labels=True).fit(c)
