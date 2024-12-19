@@ -30,7 +30,6 @@ try:
 except ImportError:
     _HAVE_HDBSCAN = False
 
-from numba.typed import Dict
 
 
 def to_numpy_rec_array(named_tuple_tree):
@@ -137,7 +136,7 @@ def fast_hdbscan(
     data,
     data_labels=None,
     semi_supervised=False,
-    ss_algorithm=None,
+    ss_algorithm='bc',
     min_samples=10,
     min_cluster_size=10,
     cluster_selection_method="eom",
@@ -149,17 +148,14 @@ def fast_hdbscan(
 ):
     data = check_array(data)
 
-    if semi_supervised and data_labels is None:
-        raise ValueError(
-            "data_labels must not be None when semi_supervised is set to True!"
-        )
-
+    # Detect parameter inconsistencies early.
     if semi_supervised:
-        label_indices = np.flatnonzero(data_labels > -1)
-        label_values = data_labels[label_indices]
-        data_labels_dict = Dict()
-        for index, label in zip(label_indices, label_values):
-            data_labels_dict[index] = label
+        if data_labels is None:
+            raise ValueError(
+                "data_labels must not be None when semi_supervised is set to True!"
+            )
+        if ss_algorithm not in ["bc", "bc_simple"]:
+            raise ValueError(f"Invalid ss_algorithm {ss_algorithm}")
 
     if (
         (not (np.issubdtype(type(min_samples), np.integer) or min_samples is None))
@@ -184,38 +180,61 @@ def fast_hdbscan(
         min_samples=min_cluster_size if min_samples is None else min_samples,
         sample_weights=sample_weights,
     )
+
+    return fast_hdbscan_mst_edges(
+        edges,
+        data_labels=data_labels,
+        semi_supervised=semi_supervised,
+        ss_algorithm=ss_algorithm,
+        min_cluster_size=min_cluster_size,
+        cluster_selection_method=cluster_selection_method,
+        max_cluster_size=max_cluster_size,
+        allow_single_cluster=allow_single_cluster,
+        cluster_selection_epsilon=cluster_selection_epsilon,
+        sample_weights=sample_weights,
+    )[: (None if return_trees else 2)]
+
+
+def fast_hdbscan_mst_edges(
+    edges,
+    data_labels=None,
+    semi_supervised=False,
+    ss_algorithm='bc',
+    min_cluster_size=10,
+    cluster_selection_method="eom",
+    max_cluster_size=np.inf,
+    allow_single_cluster=False,
+    cluster_selection_epsilon=0.0,
+    sample_weights=None,
+):
     sorted_mst = edges[np.argsort(edges.T[2])]
     if sample_weights is None:
         linkage_tree = mst_to_linkage_tree(sorted_mst)
     else:
         linkage_tree = mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights)
-    condensed_tree = condense_tree(linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights)
+    condensed_tree = condense_tree(
+        linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights
+    )
     if cluster_selection_epsilon > 0.0 or cluster_selection_method == "eom":
         cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 
     if cluster_selection_method == "eom":
         if semi_supervised:
-            if ss_algorithm == "bc":
-                selected_clusters = extract_clusters_bcubed(
-                    condensed_tree,
-                    cluster_tree,
-                    data_labels_dict,
-                    allow_virtual_nodes=True,
-                    allow_single_cluster=allow_single_cluster,
-                )
-            elif ss_algorithm == "bc_simple":
-                selected_clusters = extract_clusters_bcubed(
-                    condensed_tree,
-                    cluster_tree,
-                    data_labels_dict,
-                    allow_virtual_nodes=False,
-                    allow_single_cluster=allow_single_cluster,
-                )
-            else:
-                raise ValueError(f"Invalid ss_algorithm {ss_algorithm}")
+            # Silently ignores max_cluster_size!
+            # Assumes ss_algorithm is either 'bc' or 'bc_simple'
+            selected_clusters = extract_clusters_bcubed(
+                condensed_tree,
+                cluster_tree,
+                data_labels,
+                allow_virtual_nodes=True if ss_algorithm == "bc" else False,
+                allow_single_cluster=allow_single_cluster,
+            )
         else:
             selected_clusters = extract_eom_clusters(
-                condensed_tree, cluster_tree, max_cluster_size=max_cluster_size, allow_single_cluster=allow_single_cluster
+                condensed_tree,
+                cluster_tree,
+                max_cluster_size=max_cluster_size,
+                allow_single_cluster=allow_single_cluster,
             )
     elif cluster_selection_method == "leaf":
         selected_clusters = extract_leaves(
@@ -235,15 +254,13 @@ def fast_hdbscan(
         condensed_tree,
         selected_clusters,
         cluster_selection_epsilon,
-        n_samples=data.shape[0],
+        n_samples=edges.shape[0] + 1,
     )
     membership_strengths = get_point_membership_strength_vector(
         condensed_tree, selected_clusters, clusters
     )
 
-    if return_trees:
-        return clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst
-    return clusters, membership_strengths
+    return clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst
 
 
 class HDBSCAN(BaseEstimator, ClusterMixin):
@@ -257,7 +274,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         max_cluster_size=np.inf,
         cluster_selection_epsilon=0.0,
         semi_supervised=False,
-        ss_algorithm=None,
+        ss_algorithm='bc',
         **kwargs,
     ):
         self.min_cluster_size = min_cluster_size
