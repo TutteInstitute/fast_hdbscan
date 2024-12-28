@@ -160,6 +160,13 @@ def eliminate_branch(branch_node, parent_node, lambda_value, parents, children, 
 CondensedTree = namedtuple('CondensedTree', ['parent', 'child', 'lambda_val', 'child_size'])
 
 
+@numba.njit()
+def empty_condensed_tree():
+    parents = np.empty(shape=0, dtype=np.intp)
+    others = np.empty(shape=0, dtype=np.float32)
+    return CondensedTree(parents, parents, others, others)
+
+
 @numba.njit(fastmath=True)
 def condense_tree(hierarchy, min_cluster_size=10, max_cluster_size=np.inf, sample_weights=None):
     root = 2 * hierarchy.shape[0]
