@@ -296,4 +296,4 @@ def parallel_boruvka(tree, min_samples=10, sample_weights=None):
         n_components = np.unique(point_components).shape[0]
 
     edges[:, 2] = np.sqrt(edges.T[2])
-    return edges
+    return edges, neighbors[:, 1:], np.sqrt(core_distances)

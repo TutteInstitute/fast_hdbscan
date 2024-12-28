@@ -13,6 +13,7 @@ from .cluster_trees import (
     mst_to_linkage_tree,
     mst_to_linkage_tree_w_sample_weights,
     condense_tree,
+    simplify_hierarchy,
     extract_eom_clusters,
     extract_leaves,
     cluster_epsilon_search,
@@ -29,7 +30,6 @@ try:
     _HAVE_HDBSCAN = True
 except ImportError:
     _HAVE_HDBSCAN = False
-
 
 
 def to_numpy_rec_array(named_tuple_tree):
@@ -143,6 +143,7 @@ def fast_hdbscan(
     max_cluster_size=np.inf,
     allow_single_cluster=False,
     cluster_selection_epsilon=0.0,
+    cluster_selection_persistence=0.0,
     sample_weights=None,
     return_trees=False,
 ):
@@ -172,31 +173,50 @@ def fast_hdbscan(
         raise ValueError(
             "Cluster selection epsilon must be a positive floating point number!"
         )
+    if (
+        not np.issubdtype(type(cluster_selection_persistence), np.floating)
+        or cluster_selection_persistence < 0.0
+    ):
+        raise ValueError(
+            "Cluster selection persistence must be a positive floating point number!"
+        )
 
-    sklearn_tree = KDTree(data)
-    numba_tree = kdtree_to_numba(sklearn_tree)
-    edges = parallel_boruvka(
-        numba_tree,
+    minimum_spanning_tree, neighbors, core_distances = compute_minimum_spanning_tree(
+        data,
         min_samples=min_cluster_size if min_samples is None else min_samples,
         sample_weights=sample_weights,
     )
 
-    return fast_hdbscan_mst_edges(
-        edges,
-        data_labels=data_labels,
-        semi_supervised=semi_supervised,
-        ss_algorithm=ss_algorithm,
-        min_cluster_size=min_cluster_size,
-        cluster_selection_method=cluster_selection_method,
-        max_cluster_size=max_cluster_size,
-        allow_single_cluster=allow_single_cluster,
-        cluster_selection_epsilon=cluster_selection_epsilon,
-        sample_weights=sample_weights,
+    return (
+        *clusters_from_spanning_tree(
+            minimum_spanning_tree,
+            data_labels=data_labels,
+            semi_supervised=semi_supervised,
+            ss_algorithm=ss_algorithm,
+            min_cluster_size=min_cluster_size,
+            cluster_selection_method=cluster_selection_method,
+            max_cluster_size=max_cluster_size,
+            allow_single_cluster=allow_single_cluster,
+            cluster_selection_epsilon=cluster_selection_epsilon,
+            cluster_selection_persistence=cluster_selection_persistence,
+            sample_weights=sample_weights,
+        ),
+        neighbors,
+        core_distances,
     )[: (None if return_trees else 2)]
 
 
-def fast_hdbscan_mst_edges(
-    edges,
+def compute_minimum_spanning_tree(data, min_samples=10, sample_weights=None):
+    sklearn_tree = KDTree(data)
+    numba_tree = kdtree_to_numba(sklearn_tree)
+    edges, neighbors, core_distances = parallel_boruvka(
+        numba_tree, min_samples=min_samples, sample_weights=sample_weights
+    )
+    return edges, neighbors, core_distances
+
+
+def clusters_from_spanning_tree(
+    minimum_spanning_tree,
     data_labels=None,
     semi_supervised=False,
     ss_algorithm='bc',
@@ -205,22 +225,28 @@ def fast_hdbscan_mst_edges(
     max_cluster_size=np.inf,
     allow_single_cluster=False,
     cluster_selection_epsilon=0.0,
+    cluster_selection_persistence=0.0,
     sample_weights=None,
 ):
-    sorted_mst = edges[np.argsort(edges.T[2])]
+    n_points = minimum_spanning_tree.shape[0] + 1
+    sorted_mst = minimum_spanning_tree[np.argsort(minimum_spanning_tree.T[2])]
+    
     if sample_weights is None:
         linkage_tree = mst_to_linkage_tree(sorted_mst)
     else:
         linkage_tree = mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights)
+    
     condensed_tree = condense_tree(
         linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights
     )
-    if cluster_selection_epsilon > 0.0 or cluster_selection_method == "eom":
-        cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
-
+    if cluster_selection_persistence > 0.0:
+        condensed_tree = simplify_hierarchy(
+            condensed_tree, n_points, cluster_selection_persistence
+        )
+    
+    cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
     if cluster_selection_method == "eom":
         if semi_supervised:
-            # Silently ignores max_cluster_size!
             # Assumes ss_algorithm is either 'bc' or 'bc_simple'
             selected_clusters = extract_clusters_bcubed(
                 condensed_tree,
@@ -237,9 +263,10 @@ def fast_hdbscan_mst_edges(
                 allow_single_cluster=allow_single_cluster,
             )
     elif cluster_selection_method == "leaf":
-        selected_clusters = extract_leaves(
-            condensed_tree, allow_single_cluster=allow_single_cluster
-        )
+        if cluster_tree.parent.shape[0] == 0:
+            selected_clusters = np.empty(0, dtype=np.int64)
+        else:
+            selected_clusters = extract_leaves(cluster_tree, n_points)
     else:
         raise ValueError(f"Invalid cluster_selection_method {cluster_selection_method}")
 
@@ -247,14 +274,14 @@ def fast_hdbscan_mst_edges(
         selected_clusters = cluster_epsilon_search(
             selected_clusters,
             cluster_tree,
-            min_persistence=cluster_selection_epsilon,
+            min_epsilon=cluster_selection_epsilon,
         )
 
     clusters = get_cluster_label_vector(
         condensed_tree,
         selected_clusters,
         cluster_selection_epsilon,
-        n_samples=edges.shape[0] + 1,
+        n_samples=n_points
     )
     membership_strengths = get_point_membership_strength_vector(
         condensed_tree, selected_clusters, clusters
@@ -273,6 +300,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         allow_single_cluster=False,
         max_cluster_size=np.inf,
         cluster_selection_epsilon=0.0,
+        cluster_selection_persistence=0.0,
         semi_supervised=False,
         ss_algorithm='bc',
         **kwargs,
@@ -283,6 +311,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         self.allow_single_cluster = allow_single_cluster
         self.max_cluster_size = max_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
+        self.cluster_selection_persistence = cluster_selection_persistence
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
 
@@ -333,6 +362,8 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             self._single_linkage_tree,
             self._condensed_tree,
             self._min_spanning_tree,
+            self._neighbors,
+            self._core_distances
         ) = fast_hdbscan(
             clean_data,
             clean_data_labels,
