@@ -3,7 +3,6 @@ Converts data point lens values into edge distances and looks for clusters
 induced by those distances within the clusters found by HDBSCAN.
 """
 
-import numba
 import numpy as np
 from sklearn.utils.validation import check_is_fitted
 from sklearn.base import BaseEstimator, ClusterMixin
@@ -123,6 +122,48 @@ def update_labels(
     return labels, probabilities, sub_labels, sub_probabilities, lens_values
 
 
+def propagate_sub_cluster_labels(labels, sub_labels, graph_list, points_list):
+    running_id = 0
+    for points, core_graph in zip(points_list, graph_list):
+        # Skip clusters with no labelled branches
+        unique_sub_labels = np.unique(sub_labels[points])
+        if unique_sub_labels[0] != -1 or len(unique_sub_labels) == 1:
+            continue
+
+        # Create undirected core graph
+        undirected = [
+            {np.int32(0): np.float32(0.0) for _ in range(0)} for _ in range(len(points))
+        ]
+        for idx, (start, end) in enumerate(
+            zip(core_graph.indptr, core_graph.indptr[1:])
+        ):
+            for i in range(start, end):
+                neighbor = core_graph.indices[i]
+                undirected[idx][neighbor] = 1 / core_graph.weights[i]
+                undirected[neighbor][idx] = 1 / core_graph.weights[i]
+
+        # Repeat density-weighted majority votes on noise points until all are assigned
+        while True:
+            noise_idx = np.nonzero(sub_labels[points] == -1)[0]
+            if noise_idx.shape[0] == 0:
+                break
+            for idx in noise_idx:
+                candidates = {np.int32(0): np.float32(0.0) for _ in range(0)}
+                for neighbor_idx, weight in undirected[idx].items():
+                    label = sub_labels[points[neighbor_idx]]
+                    if label == -1:
+                        continue
+                    candidates[label] = candidates.get(label, 0.0) + weight
+
+                if len(candidates) == 0:
+                    continue
+                sub_labels[points[idx]] = max(candidates.items(), key=lambda x: x[1])[0]
+
+        labels[points] = sub_labels[points] + running_id
+        running_id += len(unique_sub_labels) - 1
+    return labels, sub_labels
+
+
 def remap_results(
     labels,
     probabilities,
@@ -192,6 +233,7 @@ def find_sub_clusters(
     cluster_selection_method=None,
     cluster_selection_epsilon=0.0,
     cluster_selection_persistence=0.0,
+    propagate_labels=False,
 ):
     check_is_fitted(
         clusterer,
@@ -323,6 +365,12 @@ def find_sub_clusters(
         data.shape[0],
     )
 
+    # Propagate labels if requested
+    if propagate_labels:
+        labels, sub_labels = propagate_sub_cluster_labels(
+            labels, sub_labels, core_graphs, points
+        )
+
     # Reset for infinite data points
     if last_outlier > 0:
         (
@@ -377,6 +425,7 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
         cluster_selection_method="eom",
         cluster_selection_epsilon=0.0,
         cluster_selection_persistence=0.0,
+        propagate_labels=False,
     ):
         self.lens_values = lens_values
         self.min_cluster_size = min_cluster_size
@@ -385,6 +434,7 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
         self.cluster_selection_method = cluster_selection_method
         self.cluster_selection_epsilon = cluster_selection_epsilon
         self.cluster_selection_persistence = cluster_selection_persistence
+        self.propagate_labels = propagate_labels
 
     def fit(self, clusterer, labels=None, probabilities=None, lens_callback=None):
         """labels and probabilities override the clusterer's values."""
@@ -413,6 +463,7 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
             cluster_selection_method=self.cluster_selection_method,
             cluster_selection_epsilon=self.cluster_selection_epsilon,
             cluster_selection_persistence=self.cluster_selection_persistence,
+            propagate_labels=self.propagate_labels,
         )
         # also store the core distances and raw data for the member functions
         self._raw_data = clusterer._raw_data
@@ -457,7 +508,6 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
             sub_cluster_name=sub_cluster_name,
             raw_data=self._raw_data,
         )
-
 
     @property
     def condensed_trees_(self):

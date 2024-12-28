@@ -49,6 +49,7 @@ def find_branch_sub_clusters(
     branch_selection_epsilon=0.0,
     branch_selection_persistence=0.0,
     label_sides_as_branches=False,
+    propagate_labels=False,
 ):
     result = find_sub_clusters(
         clusterer,
@@ -61,6 +62,7 @@ def find_branch_sub_clusters(
         cluster_selection_method=branch_selection_method,
         cluster_selection_epsilon=branch_selection_epsilon,
         cluster_selection_persistence=branch_selection_persistence,
+        propagate_labels=propagate_labels,
     )
     apply_branch_threshold(
         result[0],
@@ -101,6 +103,7 @@ class BranchDetector(SubClusterDetector):
         branch_selection_epsilon=0.0,
         branch_selection_persistence=0.0,
         label_sides_as_branches=False,
+        propagate_labels=False,
     ):
         super().__init__(
             min_cluster_size=min_branch_size,
@@ -109,6 +112,7 @@ class BranchDetector(SubClusterDetector):
             cluster_selection_method=branch_selection_method,
             cluster_selection_epsilon=branch_selection_epsilon,
             cluster_selection_persistence=branch_selection_persistence,
+            propagate_labels=propagate_labels,
         )
         self.label_sides_as_branches = label_sides_as_branches
 

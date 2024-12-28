@@ -84,6 +84,12 @@ def test_selection_method():
     check_detected_groups(b, n_clusters=2, n_subs=7)
 
 
+def test_label_propagation():
+    b = SubClusterDetector(lens_values=centrality, propagate_labels=True).fit(c)
+    assert np.all(b.sub_cluster_labels_ >= 0)
+    check_detected_groups(b, n_clusters=2, n_subs=5)
+
+
 def test_min_cluster_size():
     b = SubClusterDetector(lens_values=centrality, min_cluster_size=7).fit(c)
     labels, counts = np.unique(b.labels_[b.sub_cluster_labels_ >= 0], return_counts=True)
