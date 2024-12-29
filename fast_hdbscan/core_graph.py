@@ -43,26 +43,6 @@ def knn_mst_union(neighbors, core_distances, min_spanning_tree, lens_values):
     return graph
 
 
-@numba.njit(parallel=True)
-def sort_by_lens(graph):
-    for point in numba.prange(len(graph)):
-        graph[point] = {
-            k: v for k, v in sorted(graph[point].items(), key=lambda item: item[1][0])
-        }
-    return graph
-
-
-@numba.njit(parallel=True)
-def apply_lens(core_graph, lens_values):
-    # Apply new lens to the graph
-    for point in numba.prange(len(lens_values)):
-        children = core_graph[point]
-        point_lens = lens_values[point]
-        for child, value in children.items():
-            children[child] = (max(point_lens, lens_values[child]), value[1])
-    return sort_by_lens(core_graph)
-
-
 @numba.njit()
 def flatten_to_csr(graph):
     # Count children to form indptr
@@ -88,18 +68,45 @@ def flatten_to_csr(graph):
     return CoreGraph(weights, distances, indices, indptr)
 
 
+@numba.njit(parallel=True)
+def sort_by_lens(graph):
+    for point in numba.prange(len(graph)):
+        start = graph.indptr[point]
+        end = graph.indptr[point + 1]
+        weights = graph.weights[start:end]
+        order = np.argsort(weights)
+        graph.weights[start:end] = weights[order]
+        graph.distances[start:end] = graph.distances[start:end][order]
+        graph.indices[start:end] = graph.indices[start:end][order]
+    return graph
+
+
+@numba.njit(parallel=True)
+def apply_lens(core_graph, lens_values):
+    # Apply new lens to the graph
+    for point in numba.prange(len(lens_values)):
+        point_lens = lens_values[point]
+        start = core_graph.indptr[point]
+        end = core_graph.indptr[point + 1]
+        for idx, child in enumerate(core_graph.indices[start:end]):
+            core_graph.weights[start + idx] = max(point_lens, lens_values[child])
+    return sort_by_lens(core_graph)
+
+
 @numba.njit(locals={"parent": numba.types.int32})
-def select_components(graph, point_components):
+def select_components(distances, indices, indptr, point_components):
     component_edges = {
         np.int64(0): (np.int32(0), np.int32(1), np.float32(0.0)) for _ in range(0)
     }
 
     # Find the best edges from each component
-    for parent, (children, from_component) in enumerate(zip(graph, point_components)):
-        if len(children) == 0:
+    for parent, from_component in enumerate(point_components):
+        start = indptr[parent]
+        if indices[start] == -1:
             continue
-        neighbor = next(iter(children.keys()))
-        distance = np.float32(children[neighbor][0])
+
+        neighbor = indices[start]
+        distance = distances[start]
         if from_component in component_edges:
             if distance < component_edges[from_component][2]:
                 component_edges[from_component] = (parent, neighbor, distance)
@@ -109,15 +116,22 @@ def select_components(graph, point_components):
     return component_edges
 
 
-@numba.njit()  # enabling parallel breaks this function
-def update_graph_components(graph, point_components):
-    # deleting from dictionary during iteration breaks in numba.
-    for point in numba.prange(len(graph)):
-        graph[point] = {
-            child: (weight, distance)
-            for child, (weight, distance) in graph[point].items()
-            if point_components[child] != point_components[point]
-        }
+@numba.njit(parallel=True)
+def update_graph_components(distances, indices, indptr, point_components):
+    for point in numba.prange(len(point_components)):
+        counter = 0
+        start = indptr[point]
+        end = indptr[point + 1]
+        for idx in range(start, end):
+            child = indices[idx]
+            if child == -1:
+                break
+            if point_components[child] != point_components[point]:
+                indices[start + counter] = indices[idx]
+                distances[start + counter] = distances[idx]
+                counter += 1
+        indices[start + counter : end] = -1
+        distances[start + counter : end] = np.inf
 
 
 @numba.njit()
@@ -125,25 +139,29 @@ def minimum_spanning_tree(graph, overwrite=False):
     """
     Implements Boruvka on lod-style graph with multiple connected components.
     """
+    distances = graph.weights
+    indices = graph.indices
+    indptr = graph.indptr
     if not overwrite:
-        graph = [children for children in graph]
+        indices = indices.copy()
+        distances = distances.copy()
 
-    disjoint_set = ds_rank_create(len(graph))
-    point_components = np.arange(len(graph))
+    disjoint_set = ds_rank_create(len(indptr) - 1)
+    point_components = np.arange(len(indptr) - 1)
     n_components = len(point_components)
 
     edges_list = [np.empty((0, 3), dtype=np.float64) for _ in range(0)]
     while n_components > 1:
         new_edges = merge_components(
             disjoint_set,
-            select_components(graph, point_components),
+            select_components(distances, indices, indptr, point_components),
         )
         if new_edges.shape[0] == 0:
             break
 
         edges_list.append(new_edges)
         update_point_components(disjoint_set, point_components)
-        update_graph_components(graph, point_components)
+        update_graph_components(distances, indices, indptr, point_components)
         n_components -= new_edges.shape[0]
 
     counter = 0
@@ -155,12 +173,14 @@ def minimum_spanning_tree(graph, overwrite=False):
     return n_components, point_components, result
 
 
-@numba.njit()
+# @numba.njit()
 def core_graph_spanning_tree(neighbors, core_distances, min_spanning_tree, lens):
     graph = sort_by_lens(
-        knn_mst_union(neighbors, core_distances, min_spanning_tree, lens)
+        flatten_to_csr(
+            knn_mst_union(neighbors, core_distances, min_spanning_tree, lens)
+        )
     )
-    return (*minimum_spanning_tree(graph), flatten_to_csr(graph))
+    return (*minimum_spanning_tree(graph), graph)
 
 
 def core_graph_clusters(
