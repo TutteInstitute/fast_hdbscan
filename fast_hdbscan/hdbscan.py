@@ -392,6 +392,10 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
 
         return self
 
+    def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
+        self.fit(X, y, sample_weight, **fit_params)
+        return self.labels_
+
     def dbscan_clustering(self, epsilon):
         check_is_fitted(
             self,
