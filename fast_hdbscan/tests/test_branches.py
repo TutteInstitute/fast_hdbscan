@@ -78,15 +78,34 @@ def test_attributes():
 
 
 def test_selection_method():
-    b = BranchDetector(branch_selection_method="eom").fit(c)
+    b = BranchDetector(cluster_selection_method="eom").fit(c)
     check_detected_groups(b, n_clusters=2, n_branches=5)
 
-    b = BranchDetector(branch_selection_method="leaf").fit(c)
+    b = BranchDetector(cluster_selection_method="leaf").fit(c)
     check_detected_groups(b, n_clusters=2, n_branches=5)
 
 
-def test_min_branch_size():
-    b = BranchDetector(min_branch_size=7).fit(c)
+def test_label_propagation():
+    b = BranchDetector().fit(c)
+    check_detected_groups(b, n_clusters=2, n_branches=5)
+    b.labels_, b.sub_cluster_labels_ = b.propagated_labels()
+    assert np.all(b.sub_cluster_labels_ >= 0)
+    check_detected_groups(b, n_clusters=2, n_branches=4)
+
+    b = BranchDetector(propagate_labels=True).fit(c)
+    assert np.all(b.sub_cluster_labels_ >= 0)
+    check_detected_groups(b, n_clusters=2, n_branches=4)
+
+
+def test_sample_weight():
+    np.random.seed(0)
+    sample_weight = np.random.uniform(low=0, high=1, size=X.shape[0]).astype(np.float32)
+    b = BranchDetector().fit(c, sample_weight=sample_weight)
+    check_detected_groups(b, n_clusters=2, n_branches=2)
+
+
+def test_min_cluster_size():
+    b = BranchDetector(min_cluster_size=7).fit(c)
     labels, counts = np.unique(b.labels_[b.branch_probabilities_ > 0], return_counts=True)
     assert (counts[labels >= 0] >= 7).all()
     check_detected_groups(b, n_clusters=2, n_branches=5)
@@ -97,8 +116,8 @@ def test_label_sides_as_branches():
     check_detected_groups(b, n_clusters=2, n_branches=6)
 
 
-def test_max_branch_size():
-    b = BranchDetector(label_sides_as_branches=True, max_branch_size=25).fit(c)
+def test_max_cluster_size():
+    b = BranchDetector(label_sides_as_branches=True, max_cluster_size=25).fit(c)
     check_detected_groups(b, n_clusters=2, n_branches=4)
 
 
@@ -115,29 +134,29 @@ def test_override_cluster_labels():
     assert b._linkage_trees[0] is None
 
 
-def test_allow_single_branch_with_filters():
+def test_allow_single_cluster_with_filters():
     # Without persistence, find 6 branches
     b = BranchDetector(
-        min_branch_size=5,
-        branch_selection_method="leaf",
+        min_cluster_size=5,
+        cluster_selection_method="leaf",
     ).fit(c)
     unique_labels = np.unique(b.labels_)
     assert len(unique_labels) == 5
 
     # Adding persistence removes the branches
     b = BranchDetector(
-        min_branch_size=5,
-        branch_selection_method="leaf",
-        branch_selection_persistence=0.15,
+        min_cluster_size=5,
+        cluster_selection_method="leaf",
+        cluster_selection_persistence=0.15,
     ).fit(c)
     unique_labels = np.unique(b.labels_)
     assert len(unique_labels) == 2
 
     # Adding epsilon removes some branches
     b = BranchDetector(
-        min_branch_size=5,
-        branch_selection_method="leaf",
-        branch_selection_epsilon=1 / 0.002,
+        min_cluster_size=5,
+        cluster_selection_method="leaf",
+        cluster_selection_epsilon=1 / 0.002,
     ).fit(c)
     unique_labels = np.unique(b.labels_)
     assert len(unique_labels) == 2
@@ -153,21 +172,21 @@ def test_badargs():
     with pytest.raises(NotFittedError):
         find_branch_sub_clusters(c_nofit)
     with pytest.raises(ValueError):
-        find_branch_sub_clusters(c, min_branch_size=-1)
+        find_branch_sub_clusters(c, min_cluster_size=-1)
     with pytest.raises(ValueError):
-        find_branch_sub_clusters(c, min_branch_size=0)
+        find_branch_sub_clusters(c, min_cluster_size=0)
     with pytest.raises(ValueError):
-        find_branch_sub_clusters(c, min_branch_size=1)
+        find_branch_sub_clusters(c, min_cluster_size=1)
     with pytest.raises(ValueError):
-        find_branch_sub_clusters(c, min_branch_size=2.0)
+        find_branch_sub_clusters(c, min_cluster_size=2.0)
     with pytest.raises(ValueError):
-        find_branch_sub_clusters(c, min_branch_size="fail")
+        find_branch_sub_clusters(c, min_cluster_size="fail")
     with pytest.raises(ValueError):
-        find_branch_sub_clusters(c, branch_selection_persistence=-0.1)
+        find_branch_sub_clusters(c, cluster_selection_persistence=-0.1)
     with pytest.raises(ValueError):
-        find_branch_sub_clusters(c, branch_selection_epsilon=-0.1)
+        find_branch_sub_clusters(c, cluster_selection_epsilon=-0.1)
     with pytest.raises(ValueError):
         find_branch_sub_clusters(
             c,
-            branch_selection_method="something_else",
+            cluster_selection_method="something_else",
         )

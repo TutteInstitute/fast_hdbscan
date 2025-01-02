@@ -55,7 +55,8 @@ def check_detected_groups(c, n_clusters=3, n_subs=6, overridden=False):
             assert linkage_tree is not None
             assert condensed_tree is not None
 
-# --- Detecting SubClusters	
+
+# --- Detecting SubClusters
 
 
 def test_attributes():
@@ -85,9 +86,22 @@ def test_selection_method():
 
 
 def test_label_propagation():
+    b = SubClusterDetector(lens_values=centrality).fit(c)
+    check_detected_groups(b, n_clusters=2, n_subs=7)
+    b.labels_, b.sub_cluster_labels_ = b.propagated_labels()
+    assert np.all(b.sub_cluster_labels_ >= 0)
+    check_detected_groups(b, n_clusters=2, n_subs=5)
+
     b = SubClusterDetector(lens_values=centrality, propagate_labels=True).fit(c)
     assert np.all(b.sub_cluster_labels_ >= 0)
     check_detected_groups(b, n_clusters=2, n_subs=5)
+
+
+def test_sample_weight():
+    np.random.seed(0)
+    sample_weight = np.random.uniform(low=0, high=1, size=X.shape[0]).astype(np.float32)
+    b = SubClusterDetector(lens_values=centrality).fit(c, sample_weight=sample_weight)
+    check_detected_groups(b, n_clusters=2, n_subs=4)
 
 
 def test_min_cluster_size():
@@ -145,7 +159,7 @@ def test_allow_single_cluster_with_filters():
     unique_labels = np.unique(b.labels_)
     assert len(unique_labels) == 2
 
-    
+
 def test_badargs():
     c_nofit = HDBSCAN(min_cluster_size=5)
 
@@ -174,4 +188,3 @@ def test_badargs():
             c,
             cluster_selection_method="something_else",
         )
-

@@ -28,8 +28,8 @@ mst, indices, core_distances = compute_minimum_spanning_tree(X, min_samples=5)
 @nb.njit()
 def create_core_graph(mst, indices, core_distances, lens):
     # Remain in numba context to avoid warnings
-    return flatten_to_csr(
-        sort_by_lens(knn_mst_union(indices, core_distances, mst, lens))
+    return sort_by_lens(
+        flatten_to_csr(knn_mst_union(indices, core_distances, mst, lens))
     )
 
 
@@ -37,11 +37,12 @@ def test_create_core_graph():
     csr = create_core_graph(mst, indices, core_distances, lens)
     assert np.all(csr.distances > 0)
     for idx in range(len(csr.indptr) - 1):
-        assert np.all(np.diff(csr.weights[csr.indptr[idx] : csr.indptr[idx + 1]]) >= 0)
-        ws = np.maximum(
-            lens[idx], lens[csr.indices[csr.indptr[idx] : csr.indptr[idx + 1]]]
-        )
-        assert np.allclose(ws, csr.weights[csr.indptr[idx] : csr.indptr[idx + 1]])
+        start = csr.indptr[idx]
+        end = csr.indptr[idx + 1]
+        weights = csr.weights[start:end]
+        assert np.all(np.diff(weights) >= 0)
+        ws = np.maximum(lens[idx], lens[csr.indices[start:end]])
+        assert np.allclose(ws, csr.weights[start:end])
 
 
 def test_core_graph_to_rec_array():

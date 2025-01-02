@@ -70,15 +70,22 @@ def flatten_to_csr(graph):
 
 @numba.njit(parallel=True)
 def sort_by_lens(graph):
-    for point in numba.prange(len(graph)):
+    new_weights = np.empty_like(graph.weights)
+    new_distances = np.empty_like(graph.distances)
+    new_indices = np.empty_like(graph.indices)
+    for point in numba.prange(len(graph.indptr) - 1):
         start = graph.indptr[point]
         end = graph.indptr[point + 1]
-        weights = graph.weights[start:end]
-        order = np.argsort(weights)
-        graph.weights[start:end] = weights[order]
-        graph.distances[start:end] = graph.distances[start:end][order]
-        graph.indices[start:end] = graph.indices[start:end][order]
-    return graph
+        
+        row_weights = graph.weights[start:end]
+        row_distances = graph.distances[start:end]
+        row_indices = graph.indices[start:end]
+
+        order = np.argsort(row_weights)
+        new_weights[start:end] = row_weights[order]
+        new_distances[start:end] = row_distances[order]
+        new_indices[start:end] = row_indices[order]
+    return CoreGraph(new_weights, new_distances, new_indices, graph.indptr)
 
 
 @numba.njit(parallel=True)
@@ -173,7 +180,7 @@ def minimum_spanning_tree(graph, overwrite=False):
     return n_components, point_components, result
 
 
-# @numba.njit()
+@numba.njit()
 def core_graph_spanning_tree(neighbors, core_distances, min_spanning_tree, lens):
     graph = sort_by_lens(
         flatten_to_csr(

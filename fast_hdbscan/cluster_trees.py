@@ -257,7 +257,21 @@ def condense_tree(hierarchy, min_cluster_size=10, max_cluster_size=np.inf, sampl
 
 
 @numba.njit()
-def extract_leaves(cluster_tree, n_points):
+def extract_leaves(condensed_tree, allow_single_cluster=True):
+    n_nodes = condensed_tree.parent.max() + 1
+    n_points = condensed_tree.parent.min()
+    leaf_indicator = np.ones(n_nodes, dtype=np.bool_)
+    leaf_indicator[:n_points] = False
+
+    for parent, child_size in zip(condensed_tree.parent, condensed_tree.child_size):
+        if child_size > 1:
+            leaf_indicator[parent] = False
+
+    return np.nonzero(leaf_indicator)[0]
+
+
+@numba.njit()
+def cluster_tree_leaves(cluster_tree, n_points):
     n_nodes = cluster_tree.child.max() + 1
     leaf_indicator = np.ones(n_nodes - n_points, dtype=np.bool_)
     leaf_indicator[cluster_tree.parent - n_points] = False
@@ -538,7 +552,7 @@ def simplify_hierarchy(condensed_tree, n_points, persistence_threshold):
     processed = {np.int64(0)}
     processed.clear()
     while cluster_tree.parent.shape[0] > 0:
-        leaves = set(extract_leaves(cluster_tree, n_points))
+        leaves = set(cluster_tree_leaves(cluster_tree, n_points))
         births = max_lambdas(condensed_tree, leaves)
         deaths = min_lambdas(cluster_tree, leaves)
 

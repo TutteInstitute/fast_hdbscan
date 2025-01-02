@@ -28,12 +28,8 @@ def apply_branch_threshold(
             labels[pts] = running_id
             probabilities[pts] = cluster_probabilities[pts]
             running_id += 1
-            continue
         else:
-            branch_labels[pts] = np.where(
-                branch_labels[pts] < 0, num_branches, branch_labels[pts]
-            )
-            labels[pts] = branch_labels[pts] + running_id
+            labels[pts] = branch_labels[pts] + has_noise + running_id
             running_id += num_branches + has_noise
 
 
@@ -41,28 +37,25 @@ def find_branch_sub_clusters(
     clusterer,
     cluster_labels=None,
     cluster_probabilities=None,
-    *,
-    min_branch_size=None,
-    max_branch_size=None,
-    allow_single_branch=None,
-    branch_selection_method=None,
-    branch_selection_epsilon=0.0,
-    branch_selection_persistence=0.0,
     label_sides_as_branches=False,
-    propagate_labels=False,
+    min_cluster_size=None,
+    max_cluster_size=None,
+    allow_single_cluster=None,
+    cluster_selection_method=None,
+    cluster_selection_epsilon=0.0,
+    cluster_selection_persistence=0.0,
 ):
     result = find_sub_clusters(
         clusterer,
         cluster_labels,
         cluster_probabilities,
         lens_callback=compute_centrality,
-        min_cluster_size=min_branch_size,
-        max_cluster_size=max_branch_size,
-        allow_single_cluster=allow_single_branch,
-        cluster_selection_method=branch_selection_method,
-        cluster_selection_epsilon=branch_selection_epsilon,
-        cluster_selection_persistence=branch_selection_persistence,
-        propagate_labels=propagate_labels,
+        min_cluster_size=min_cluster_size,
+        max_cluster_size=max_cluster_size,
+        allow_single_cluster=allow_single_cluster,
+        cluster_selection_method=cluster_selection_method,
+        cluster_selection_epsilon=cluster_selection_epsilon,
+        cluster_selection_persistence=cluster_selection_persistence,
     )
     apply_branch_threshold(
         result[0],
@@ -95,29 +88,28 @@ class BranchDetector(SubClusterDetector):
 
     def __init__(
         self,
-        *,
-        min_branch_size=None,
-        max_branch_size=None,
-        allow_single_branch=None,
-        branch_selection_method=None,
-        branch_selection_epsilon=0.0,
-        branch_selection_persistence=0.0,
-        label_sides_as_branches=False,
+        min_cluster_size=None,
+        max_cluster_size=None,
+        allow_single_cluster=None,
+        cluster_selection_method=None,
+        cluster_selection_epsilon=0.0,
+        cluster_selection_persistence=0.0,
         propagate_labels=False,
+        label_sides_as_branches=False,
     ):
         super().__init__(
-            min_cluster_size=min_branch_size,
-            max_cluster_size=max_branch_size,
-            allow_single_cluster=allow_single_branch,
-            cluster_selection_method=branch_selection_method,
-            cluster_selection_epsilon=branch_selection_epsilon,
-            cluster_selection_persistence=branch_selection_persistence,
+            min_cluster_size=min_cluster_size,
+            max_cluster_size=max_cluster_size,
+            allow_single_cluster=allow_single_cluster,
+            cluster_selection_method=cluster_selection_method,
+            cluster_selection_epsilon=cluster_selection_epsilon,
+            cluster_selection_persistence=cluster_selection_persistence,
             propagate_labels=propagate_labels,
         )
         self.label_sides_as_branches = label_sides_as_branches
 
-    def fit(self, clusterer, labels=None, probabilities=None):
-        super().fit(clusterer, labels, probabilities, compute_centrality)
+    def fit(self, clusterer, labels=None, probabilities=None, sample_weight=None):
+        super().fit(clusterer, labels, probabilities, sample_weight, compute_centrality)
         apply_branch_threshold(
             self.labels_,
             self.sub_cluster_labels_,
@@ -131,6 +123,22 @@ class BranchDetector(SubClusterDetector):
         self.branch_probabilities_ = self.sub_cluster_probabilities_
         self.centralities_ = self.lens_values_
         return self
+
+    def propagated_labels(self, label_sides_as_branches=None):
+        if label_sides_as_branches is None:
+            label_sides_as_branches = self.label_sides_as_branches
+
+        labels, branch_labels = super().propagated_labels()
+        apply_branch_threshold(
+            labels,
+            branch_labels,
+            np.zeros_like(self.probabilities_),
+            np.zeros_like(self.probabilities_),
+            self.cluster_points_,
+            self.linkage_trees_,
+            label_sides_as_branches=label_sides_as_branches,
+        )
+        return labels, branch_labels
 
     @property
     def approximation_graph_(self):

@@ -3,8 +3,9 @@ Converts data point lens values into edge distances and looks for clusters
 induced by those distances within the clusters found by HDBSCAN.
 """
 
+import numba
 import numpy as np
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, _check_sample_weight
 from sklearn.base import BaseEstimator, ClusterMixin
 
 from .hdbscan import to_numpy_rec_array
@@ -22,6 +23,7 @@ def compute_sub_clusters_in_cluster(
     parent_labels,
     child_labels,
     lens_callback,
+    sample_weights=None,
     **kwargs,
 ):
     # Convert to within cluster indices (-1 indicates invalid neighbor)
@@ -48,6 +50,9 @@ def compute_sub_clusters_in_cluster(
             neighbors,
             core_distances,
             min_spanning_tree,
+            sample_weights=(
+                sample_weights[points] if sample_weights is not None else None
+            ),
             **kwargs,
         ),
         lens_values,
@@ -122,45 +127,64 @@ def update_labels(
     return labels, probabilities, sub_labels, sub_probabilities, lens_values
 
 
+@numba.njit()
+def propagate_labels_per_cluster(graph, sub_labels):
+    # create undirected core graph
+    undirected = [
+        {np.int64(0): np.float64(0.0) for _ in range(0)} for _ in range(len(sub_labels))
+    ]
+    for idx, (start, end) in enumerate(zip(graph.indptr, graph.indptr[1:])):
+        for i in range(start, end):
+            neighbor = graph.indices[i]
+            if sub_labels[neighbor] == -1:
+                undirected[neighbor][idx] = 1 / graph.weights[i]
+            if sub_labels[idx] == -1:
+                undirected[idx][neighbor] = 1 / graph.weights[i]
+
+    # repeat density-weighted majority votes on noise points until all are assigned
+    prev = 0
+    while True:
+        noise_idx = np.nonzero(sub_labels == -1)[0]
+        if noise_idx.shape[0] == prev:
+            break
+        prev = noise_idx.shape[0]
+        for idx in noise_idx:
+            candidates = {np.int64(0): np.float64(0.0) for _ in range(0)}
+            for neighbor_idx, weight in undirected[idx].items():
+                label = sub_labels[neighbor_idx]
+                if label == -1:
+                    continue
+                candidates[label] = candidates.get(label, 0.0) + weight
+
+            if len(candidates) == 0:
+                continue
+            max_weight = -np.inf
+            max_candidate = -1
+            for candidate, weight in candidates.items():
+                if weight > max_weight:
+                    max_weight = weight
+                    max_candidate = candidate
+            sub_labels[idx] = max_candidate
+    return sub_labels, prev
+
+
 def propagate_sub_cluster_labels(labels, sub_labels, graph_list, points_list):
     running_id = 0
-    for points, core_graph in zip(points_list, graph_list):
-        # Skip clusters with no labelled branches
+    for points, core_graph in zip(
+        points_list,
+        graph_list,
+    ):
         unique_sub_labels = np.unique(sub_labels[points])
-        if unique_sub_labels[0] != -1 or len(unique_sub_labels) == 1:
-            continue
-
-        # Create undirected core graph
-        undirected = [
-            {np.int32(0): np.float32(0.0) for _ in range(0)} for _ in range(len(points))
-        ]
-        for idx, (start, end) in enumerate(
-            zip(core_graph.indptr, core_graph.indptr[1:])
-        ):
-            for i in range(start, end):
-                neighbor = core_graph.indices[i]
-                undirected[idx][neighbor] = 1 / core_graph.weights[i]
-                undirected[neighbor][idx] = 1 / core_graph.weights[i]
-
-        # Repeat density-weighted majority votes on noise points until all are assigned
-        while True:
-            noise_idx = np.nonzero(sub_labels[points] == -1)[0]
-            if noise_idx.shape[0] == 0:
-                break
-            for idx in noise_idx:
-                candidates = {np.int32(0): np.float32(0.0) for _ in range(0)}
-                for neighbor_idx, weight in undirected[idx].items():
-                    label = sub_labels[points[neighbor_idx]]
-                    if label == -1:
-                        continue
-                    candidates[label] = candidates.get(label, 0.0) + weight
-
-                if len(candidates) == 0:
-                    continue
-                sub_labels[points[idx]] = max(candidates.items(), key=lambda x: x[1])[0]
-
+        has_noise = unique_sub_labels[0] == -1 and len(unique_sub_labels) > 1
+        if has_noise:
+            sub_labels[points], remaining = propagate_labels_per_cluster(
+                core_graph, sub_labels[points]
+            )
+            if remaining > 0:
+                raise RuntimeError('Failed to propagate all labels in sub-cluster')
         labels[points] = sub_labels[points] + running_id
-        running_id += len(unique_sub_labels) - 1
+        running_id += len(unique_sub_labels) - int(has_noise)
+
     return labels, sub_labels
 
 
@@ -225,6 +249,7 @@ def find_sub_clusters(
     clusterer,
     cluster_labels=None,
     cluster_probabilities=None,
+    sample_weights=None,
     lens_callback=None,
     *,
     min_cluster_size=None,
@@ -248,6 +273,10 @@ def find_sub_clusters(
         cluster_probabilities = np.ones(cluster_labels.shape[0], dtype=np.float32)
     if cluster_probabilities is None:
         cluster_probabilities = clusterer.probabilities_
+    if sample_weights is not None:
+        sample_weights = _check_sample_weight(
+            sample_weights, clusterer._raw_data, dtype=np.float32
+        )
     if min_cluster_size is None:
         min_cluster_size = clusterer.min_cluster_size
     if max_cluster_size is None:
@@ -303,6 +332,9 @@ def find_sub_clusters(
         data = data[finite_index]
         cluster_labels = cluster_labels[finite_index]
         cluster_probabilities = cluster_probabilities[finite_index]
+        sample_weights = (
+            sample_weights[finite_index] if sample_weights is not None else None
+        )
 
     # Convert lens value array to callback
     if isinstance(lens_callback, np.ndarray):
@@ -345,6 +377,7 @@ def find_sub_clusters(
             cluster_selection_method=cluster_selection_method,
             cluster_selection_epsilon=cluster_selection_epsilon,
             cluster_selection_persistence=cluster_selection_persistence,
+            sample_weights=sample_weights,
         )
     )
 
@@ -436,7 +469,14 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
         self.cluster_selection_persistence = cluster_selection_persistence
         self.propagate_labels = propagate_labels
 
-    def fit(self, clusterer, labels=None, probabilities=None, lens_callback=None):
+    def fit(
+        self,
+        clusterer,
+        labels=None,
+        probabilities=None,
+        sample_weight=None,
+        lens_callback=None,
+    ):
         """labels and probabilities override the clusterer's values."""
         # get_params breaks with inherited classes!
         (
@@ -448,6 +488,7 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
             self.sub_cluster_probabilities_,
             self._approximation_graphs,
             self._condensed_trees,
+
             self._linkage_trees,
             self._spanning_trees,
             self.lens_values_,
@@ -456,6 +497,7 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
             clusterer,
             labels,
             probabilities,
+            sample_weight,
             self.lens_values if lens_callback is None else lens_callback,
             min_cluster_size=self.min_cluster_size,
             max_cluster_size=self.max_cluster_size,
@@ -470,9 +512,19 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
         self._core_distances = clusterer._core_distances
         return self
 
-    def fit_predict(self, clusterer, labels=None, probabilities=None):
-        self.fit(clusterer, labels, probabilities)
-        return self.labels_
+    def propagated_labels(self):
+        """Propagate sub-cluster labels to noise points."""
+        check_is_fitted(
+            self,
+            "labels_",
+            msg="You first need to fit the SubClusterDetector model before propagating the labels.",
+        )
+        return propagate_sub_cluster_labels(
+            self.labels_,
+            self.sub_cluster_labels_,
+            self._approximation_graphs,
+            self.cluster_points_,
+        )
 
     @property
     def approximation_graph_(self):

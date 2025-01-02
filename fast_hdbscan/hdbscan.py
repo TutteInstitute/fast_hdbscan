@@ -15,7 +15,7 @@ from .cluster_trees import (
     condense_tree,
     simplify_hierarchy,
     extract_eom_clusters,
-    extract_leaves,
+    cluster_tree_leaves,
     cluster_epsilon_search,
     get_cluster_labelling_at_cut,
     get_cluster_label_vector,
@@ -266,7 +266,7 @@ def clusters_from_spanning_tree(
         if cluster_tree.parent.shape[0] == 0:
             selected_clusters = np.empty(0, dtype=np.int64)
         else:
-            selected_clusters = extract_leaves(cluster_tree, n_points)
+            selected_clusters = cluster_tree_leaves(cluster_tree, n_points)
     else:
         raise ValueError(f"Invalid cluster_selection_method {cluster_selection_method}")
 
@@ -319,8 +319,6 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
 
         if self.semi_supervised:
             X, y = check_X_y(X, y, accept_sparse="csr", force_all_finite=False)
-            if sample_weight is not None:
-                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
             self._raw_labels = y
             # Replace non-finite labels with -1 labels
             y[~np.isfinite(y)] = -1
@@ -331,9 +329,9 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
                 )
         else:
             X = check_array(X, accept_sparse="csr", force_all_finite=False)
-            if sample_weight is not None:
-                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
             self._raw_data = X
+        if sample_weight is not None:
+            sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
 
         self._all_finite = np.all(np.isfinite(X))
         if ~self._all_finite:
@@ -341,10 +339,8 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             # We will later assign all non-finite points to the background -1 cluster
             finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
             clean_data = X[finite_index]
-            clean_data_labels = y
-
-            if self.semi_supervised:
-                clean_data_labels = y[finite_index]
+            clean_data_labels = y[finite_index] if self.semi_supervised else None
+            sample_weight = sample_weight[finite_index] if sample_weight is not None else None
 
             internal_to_raw = {
                 x: y for x, y in zip(range(len(finite_index)), finite_index)
@@ -391,10 +387,6 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             self.probabilities_ = new_probabilities
 
         return self
-
-    def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
-        self.fit(X, y, sample_weight, **fit_params)
-        return self.labels_
 
     def dbscan_clustering(self, epsilon):
         check_is_fitted(
