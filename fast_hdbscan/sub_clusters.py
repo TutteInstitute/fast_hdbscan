@@ -142,12 +142,10 @@ def propagate_labels_per_cluster(graph, sub_labels):
                 undirected[idx][neighbor] = 1 / graph.weights[i]
 
     # repeat density-weighted majority votes on noise points until all are assigned
-    prev = 0
     while True:
         noise_idx = np.nonzero(sub_labels == -1)[0]
-        if noise_idx.shape[0] == prev:
+        if noise_idx.shape[0] == 0:
             break
-        prev = noise_idx.shape[0]
         for idx in noise_idx:
             candidates = {np.int64(0): np.float64(0.0) for _ in range(0)}
             for neighbor_idx, weight in undirected[idx].items():
@@ -165,7 +163,7 @@ def propagate_labels_per_cluster(graph, sub_labels):
                     max_weight = weight
                     max_candidate = candidate
             sub_labels[idx] = max_candidate
-    return sub_labels, prev
+    return sub_labels
 
 
 def propagate_sub_cluster_labels(labels, sub_labels, graph_list, points_list):
@@ -177,11 +175,9 @@ def propagate_sub_cluster_labels(labels, sub_labels, graph_list, points_list):
         unique_sub_labels = np.unique(sub_labels[points])
         has_noise = unique_sub_labels[0] == -1 and len(unique_sub_labels) > 1
         if has_noise:
-            sub_labels[points], remaining = propagate_labels_per_cluster(
+            sub_labels[points] = propagate_labels_per_cluster(
                 core_graph, sub_labels[points]
             )
-            if remaining > 0:
-                raise RuntimeError('Failed to propagate all labels in sub-cluster')
         labels[points] = sub_labels[points] + running_id
         running_id += len(unique_sub_labels) - int(has_noise)
 
@@ -488,7 +484,6 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
             self.sub_cluster_probabilities_,
             self._approximation_graphs,
             self._condensed_trees,
-
             self._linkage_trees,
             self._spanning_trees,
             self.lens_values_,

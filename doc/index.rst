@@ -77,6 +77,7 @@ User Guide
    benchmarks
    comparable_clusterings
    detecting_branches
+   for_developers
 
 
 ----------
