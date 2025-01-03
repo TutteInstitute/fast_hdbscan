@@ -116,7 +116,7 @@ class BranchDetector(SubClusterDetector):
             self.probabilities_,
             self.cluster_probabilities_,
             self.cluster_points_,
-            self.linkage_trees_,
+            self._linkage_trees,
             label_sides_as_branches=self.label_sides_as_branches,
         )
         self.branch_labels_ = self.sub_cluster_labels_
@@ -135,7 +135,7 @@ class BranchDetector(SubClusterDetector):
             np.zeros_like(self.probabilities_),
             np.zeros_like(self.probabilities_),
             self.cluster_points_,
-            self.linkage_trees_,
+            self._linkage_trees,
             label_sides_as_branches=label_sides_as_branches,
         )
         return labels, branch_labels

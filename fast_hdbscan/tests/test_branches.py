@@ -7,6 +7,13 @@ import numpy as np
 from sklearn.exceptions import NotFittedError
 from fast_hdbscan import HDBSCAN, BranchDetector, find_branch_sub_clusters
 
+try:
+    from hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
+
+    HAVE_HDBSCAN = True
+except ModuleNotFoundError:
+    HAVE_HDBSCAN = False
+
 
 def make_branches(points_per_branch=30):
     # Control points for line segments that merge three clusters
@@ -59,22 +66,15 @@ def check_detected_groups(c, n_clusters=3, n_branches=6, overridden=False):
 # --- Detecting Branches
 
 
+@pytest.mark.skipif(not HAVE_HDBSCAN, reason='Requires HDBSCAN')
 def test_attributes():
-    def check_attributes():
-        b = BranchDetector().fit(c)
-        check_detected_groups(b, n_clusters=2, n_branches=5)
-        assert len(b.linkage_trees_) == 2
-        assert len(b.condensed_trees_) == 2
-        assert isinstance(b.condensed_trees_[0], CondensedTree)
-        assert isinstance(b.linkage_trees_[0], SingleLinkageTree)
-        assert isinstance(b.approximation_graph_, ApproximationGraph)
-
-    try:
-        from hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
-
-        check_attributes()
-    except ImportError:
-        pass
+    b = BranchDetector().fit(c)
+    check_detected_groups(b, n_clusters=2, n_branches=5)
+    assert len(b.linkage_trees_) == 2
+    assert len(b.condensed_trees_) == 2
+    assert isinstance(b.condensed_trees_[0], CondensedTree)
+    assert isinstance(b.linkage_trees_[0], SingleLinkageTree)
+    assert isinstance(b.approximation_graph_, ApproximationGraph)
 
 
 def test_selection_method():
