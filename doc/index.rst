@@ -76,6 +76,8 @@ User Guide
    basic_usage
    benchmarks
    comparable_clusterings
+   detecting_branches
+   for_developers
 
 
 ----------

@@ -4,26 +4,33 @@ import numpy as np
 from .disjoint_set import ds_rank_create, ds_find, ds_union_by_rank
 from .numba_kdtree import parallel_tree_query, rdist, point_to_node_lower_bound_rdist
 
-@numba.njit(locals={"i": numba.types.int64})
-def merge_components(disjoint_set, candidate_neighbors, candidate_neighbor_distances, point_components):
-    component_edges = {np.int64(0): (np.int64(0), np.int64(1), np.float32(0.0)) for i in range(0)}
+
+@numba.njit(locals={"parent": numba.types.int32})
+def select_components(candidate_distances, candidate_neighbors, point_components):
+    component_edges = {np.int64(0): (np.int32(0), np.int32(1), np.float32(0.0)) for i in range(0)}
 
     # Find the best edges from each component
-    for i in range(candidate_neighbors.shape[0]):
-        from_component = np.int64(point_components[i])
+    for parent, (distance, neighbor, from_component) in enumerate(
+        zip(candidate_distances, candidate_neighbors, point_components)
+    ):
         if from_component in component_edges:
-            if candidate_neighbor_distances[i] < component_edges[from_component][2]:
-                component_edges[from_component] = (np.int64(i), np.int64(candidate_neighbors[i]), candidate_neighbor_distances[i])
+            if distance < component_edges[from_component][2]:
+                component_edges[from_component] = (parent, neighbor, distance)
         else:
-            component_edges[from_component] = (np.int64(i), np.int64(candidate_neighbors[i]), candidate_neighbor_distances[i])
+            component_edges[from_component] = (parent, neighbor, distance)
 
+    return component_edges
+
+
+@numba.njit()
+def merge_components(disjoint_set, component_edges):
     result = np.empty((len(component_edges), 3), dtype=np.float64)
     result_idx = 0
 
     # Add the best edges to the edge set and merge the relevant components
     for edge in component_edges.values():
-        from_component = ds_find(disjoint_set, np.int32(edge[0]))
-        to_component = ds_find(disjoint_set, np.int32(edge[1]))
+        from_component = ds_find(disjoint_set, edge[0])
+        to_component = ds_find(disjoint_set, edge[1])
         if from_component != to_component:
             result[result_idx] = (np.float64(edge[0]), np.float64(edge[1]), np.float64(edge[2]))
             result_idx += 1
@@ -34,10 +41,13 @@ def merge_components(disjoint_set, candidate_neighbors, candidate_neighbor_dista
 
 
 @numba.njit(parallel=True)
-def update_component_vectors(tree, disjoint_set, node_components, point_components):
+def update_point_components(disjoint_set, point_components):
     for i in numba.prange(point_components.shape[0]):
         point_components[i] = ds_find(disjoint_set, np.int32(i))
 
+
+@numba.njit()
+def update_node_components(tree, node_components, point_components):
     for i in range(tree.node_data.shape[0] - 1, -1, -1):
         node_info = tree.node_data[i]
 
@@ -272,28 +282,28 @@ def parallel_boruvka(tree, min_samples=10, sample_weights=None):
         expected_neighbors = min_samples / mean_sample_weight
         distances, neighbors = parallel_tree_query(tree, tree.data, k=int(2 * expected_neighbors))
         core_distances = sample_weight_core_distance(distances, neighbors, sample_weights, min_samples)
-        edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
-        update_component_vectors(tree, components_disjoint_set, node_components, point_components)
     else:
         if min_samples > 1:
             distances, neighbors = parallel_tree_query(tree, tree.data, k=min_samples + 1, output_rdist=True)
             core_distances = distances.T[-1]
-            edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
-            update_component_vectors(tree, components_disjoint_set, node_components, point_components)
         else:
             core_distances = np.zeros(tree.data.shape[0], dtype=np.float32)
             distances, neighbors = parallel_tree_query(tree, tree.data, k=2)
-            edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
-            update_component_vectors(tree, components_disjoint_set, node_components, point_components)
 
-    while n_components > 1:
+    edges = [np.empty((0, 3), dtype=np.float64) for _ in range(0)]
+    new_edges = initialize_boruvka_from_knn(neighbors, distances, core_distances, components_disjoint_set)
+    while True:
+        edges.append(new_edges)
+        n_components -= new_edges.shape[0]
+        if n_components == 1:
+            break
+        update_point_components(components_disjoint_set, point_components)
+        update_node_components(tree, node_components, point_components)
         candidate_distances, candidate_indices = boruvka_tree_query(tree, node_components, point_components,
                                                                     core_distances)
-        new_edges = merge_components(components_disjoint_set, candidate_indices, candidate_distances, point_components)
-        update_component_vectors(tree, components_disjoint_set, node_components, point_components)
+        component_edges = select_components(candidate_distances, candidate_indices, point_components)
+        new_edges = merge_components(components_disjoint_set, component_edges)
 
-        edges = np.vstack((edges, new_edges))
-        n_components = np.unique(point_components).shape[0]
-
+    edges = np.vstack(edges)
     edges[:, 2] = np.sqrt(edges.T[2])
-    return edges
+    return edges, neighbors[:, 1:], np.sqrt(core_distances)
