@@ -43,7 +43,7 @@ def knn_mst_union(neighbors, core_distances, min_spanning_tree, lens_values):
     return graph
 
 
-@numba.njit()
+@numba.njit(parallel=True)
 def flatten_to_csr(graph):
     # Count children to form indptr
     num_points = len(graph)
