@@ -410,8 +410,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         if self._condensed_tree is not None:
             return CondensedTree(
                 self._condensed_tree,
-                self.cluster_selection_method,
-                self.allow_single_cluster,
+                self.labels_,
             )
         else:
             raise AttributeError(

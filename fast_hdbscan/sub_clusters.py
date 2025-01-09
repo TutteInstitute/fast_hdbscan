@@ -515,8 +515,8 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
             msg="You first need to fit the SubClusterDetector model before propagating the labels.",
         )
         return propagate_sub_cluster_labels(
-            self.labels_,
-            self.sub_cluster_labels_,
+            self.labels_.copy(),
+            self.sub_cluster_labels_.copy(),
             self._approximation_graphs,
             self.cluster_points_,
         )
