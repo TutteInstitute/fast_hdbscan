@@ -6,7 +6,8 @@ def compute_centrality(data, probabilities, *args):
     points = args[-1]
     cluster_data = data[points, :]
     centroid = np.average(cluster_data, weights=probabilities[points], axis=0)
-    return 1 / np.linalg.norm(cluster_data - centroid[None, :], axis=1)
+    with np.errstate(divide="ignore"):
+        return 1 / np.linalg.norm(cluster_data - centroid[None, :], axis=1)
 
 
 def apply_branch_threshold(
