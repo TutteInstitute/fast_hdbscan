@@ -109,7 +109,7 @@ def select_components(distances, indices, indptr, point_components):
     # Find the best edges from each component
     for parent, from_component in enumerate(point_components):
         start = indptr[parent]
-        if indices[start] == -1:
+        if start == len(indices) or indices[start] == -1:
             continue
 
         neighbor = indices[start]

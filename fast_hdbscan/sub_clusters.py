@@ -314,6 +314,8 @@ def find_sub_clusters(
             f"Invalid cluster_selection_method: {cluster_selection_method}\n"
             f'Should be one of: "eom", "leaf"\n'
         )
+    if np.all(cluster_labels == -1):
+        raise ValueError("Input contains only noise points.")
 
     # Recover finite data points
     data = clusterer._raw_data
@@ -449,7 +451,7 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
         *,
         lens_values=None,
         min_cluster_size=None,
-        max_cluster_size=np.inf,
+        max_cluster_size=None,
         allow_single_cluster=False,
         cluster_selection_method="eom",
         cluster_selection_epsilon=0.0,

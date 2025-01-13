@@ -192,3 +192,5 @@ def test_badargs():
             c,
             cluster_selection_method="something_else",
         )
+    with pytest.raises(ValueError):
+        find_sub_clusters(c, cluster_labels=np.full_like(c.labels_, -1))
