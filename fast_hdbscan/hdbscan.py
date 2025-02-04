@@ -318,7 +318,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
     def fit(self, X, y=None, sample_weight=None, **fit_params):
 
         if self.semi_supervised:
-            X, y = check_X_y(X, y, accept_sparse="csr", force_all_finite=False)
+            X, y = check_X_y(X, y, accept_sparse="csr", ensure_all_finite=False)
             self._raw_labels = y
             # Replace non-finite labels with -1 labels
             y[~np.isfinite(y)] = -1
@@ -328,7 +328,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
                     "y must contain at least one label > -1. Currently it only contains -1 and/or non-finite labels!"
                 )
         else:
-            X = check_array(X, accept_sparse="csr", force_all_finite=False)
+            X = check_array(X, accept_sparse="csr", ensure_all_finite=False)
             self._raw_data = X
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
