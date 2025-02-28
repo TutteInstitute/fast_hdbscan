@@ -10,12 +10,12 @@ from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils._testing import (
     assert_array_equal,
     assert_array_almost_equal,
-    assert_raises,
 )
 from fast_hdbscan import (
     HDBSCAN,
     fast_hdbscan,
 )
+from fast_hdbscan.hdbscan import clusters_from_spanning_tree
 
 # from sklearn.cluster.tests.common import generate_clustered_data
 from sklearn.datasets import make_blobs
@@ -79,9 +79,8 @@ def homogeneity(labels1, labels2):
     return num_missed / 2.0
 
 
-
 def test_hdbscan_feature_vector():
-    labels, p, ltree, ctree, mtree = fast_hdbscan(X, return_trees=True)
+    labels, p, ltree, ctree, mtree, neighbors, cdists = fast_hdbscan(X, return_trees=True)
     n_clusters_1 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_1 == n_clusters
 
@@ -89,11 +88,13 @@ def test_hdbscan_feature_vector():
     n_clusters_2 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_2 == n_clusters
 
+
 def test_hdbscan_dbscan_clustering():
     clusterer = HDBSCAN().fit(X)
     labels = clusterer.dbscan_clustering(0.3)
     n_clusters_1 = len(set(labels)) - int(-1 in labels)
     assert(n_clusters == n_clusters_1)
+
 
 def test_hdbscan_no_clusters():
     labels, p= fast_hdbscan(X, min_cluster_size=len(X) + 1)
@@ -103,6 +104,7 @@ def test_hdbscan_no_clusters():
     labels = HDBSCAN(min_cluster_size=len(X) + 1).fit(X).labels_
     n_clusters_2 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_2 == 0
+
 
 def test_hdbscan_sample_weight():
     sample_weight = y.astype(np.float32)
@@ -132,23 +134,40 @@ def test_hdbscan_input_lists():
 
 
 def test_hdbscan_badargs():
-    assert_raises(ValueError, fast_hdbscan, "fail")
-    assert_raises(ValueError, fast_hdbscan, None)
-    assert_raises(ValueError, fast_hdbscan, X, min_cluster_size="fail")
-    assert_raises(ValueError, fast_hdbscan, X, min_samples="fail")
-    assert_raises(ValueError, fast_hdbscan, X, min_samples=-1)
-    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon="fail")
-    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon=-1)
-    assert_raises(ValueError, fast_hdbscan, X, cluster_selection_epsilon=-0.1)
-    assert_raises(
-        ValueError, fast_hdbscan, X, cluster_selection_method="fail"
-    )
+    with pytest.raises(ValueError): 
+        fast_hdbscan("fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(None)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, min_cluster_size="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, min_samples="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, min_samples=-1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_epsilon="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_epsilon=-1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_epsilon=-0.1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_persistence="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_persistence=1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_persistence=-0.1)
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, cluster_selection_method="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, semi_supervised=True, ss_algorithm="fail")
+    with pytest.raises(ValueError): 
+        fast_hdbscan(X, semi_supervised=True, data_labels=None)
 
 
-def test_fhdbscan_allow_single_cluster_with_epsilon():
+def test_hdbscan_allow_single_cluster_with_epsilon():
     np.random.seed(0)
     no_structure = np.random.rand(150, 2)
-    # without epsilon we should see 68 noise points and 9 labels
+    # without epsilon we should see 68 noise points and 8 labels
     c = HDBSCAN(
         min_cluster_size=5,
         cluster_selection_epsilon=0.0,
@@ -166,6 +185,42 @@ def test_fhdbscan_allow_single_cluster_with_epsilon():
     unique_labels, counts = np.unique(c.labels_, return_counts=True)
     assert len(unique_labels) == 2
     assert counts[unique_labels == -1] == 2
+
+def test_hdbscan_max_cluster_size():
+    model = HDBSCAN(max_cluster_size=30).fit(X)
+    assert len(set(model.labels_)) >= 3
+    for label in set(model.labels_):
+        if label != -1:
+            assert np.sum(model.labels_ == label) <= 30
+
+
+def test_hdbscan_persistence_threshold():
+    model = HDBSCAN(
+        min_cluster_size=5,
+        cluster_selection_method="leaf",
+        cluster_selection_persistence=20.0,
+    ).fit(X)
+    assert np.all(model.labels_ == -1)
+
+
+def test_mst_entry():
+    # Assumes default keyword arguments match between class and function
+    model = HDBSCAN(min_cluster_size=5).fit(X)
+    (
+        labels, 
+        probabilities, 
+        linkage_tree, 
+        condensed_tree, 
+        sorted_mst
+    ) = clusters_from_spanning_tree(model._min_spanning_tree, min_cluster_size=5)
+    assert np.all(model.labels_ == labels)
+    assert np.allclose(model.probabilities_, probabilities)
+    assert np.allclose(model._min_spanning_tree, sorted_mst)
+    assert np.allclose(model._single_linkage_tree, linkage_tree)
+    assert np.allclose(model._condensed_tree['parent'], condensed_tree.parent)
+    assert np.allclose(model._condensed_tree['child'], condensed_tree.child)
+    assert np.allclose(model._condensed_tree['lambda_val'], condensed_tree.lambda_val)
+    assert np.allclose(model._condensed_tree['child_size'], condensed_tree.child_size)
 
 
 # Disable for now -- need to refactor to meet newer standards

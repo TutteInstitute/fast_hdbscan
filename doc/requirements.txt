@@ -1,8 +1,9 @@
 numpy>=1.21
 numba>=0.56
-scikit-learn>=1.1
+scikit-learn>=1.6
 pygments>=2.4.1
 jupyterlab_pygments>=0.1.1
 ipykernel
 nbsphinx
 numpydoc
+sphinx_rtd_theme

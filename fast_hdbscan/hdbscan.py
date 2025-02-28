@@ -13,8 +13,9 @@ from .cluster_trees import (
     mst_to_linkage_tree,
     mst_to_linkage_tree_w_sample_weights,
     condense_tree,
+    simplify_hierarchy,
     extract_eom_clusters,
-    extract_leaves,
+    cluster_tree_leaves,
     cluster_epsilon_search,
     get_cluster_labelling_at_cut,
     get_cluster_label_vector,
@@ -29,8 +30,6 @@ try:
     _HAVE_HDBSCAN = True
 except ImportError:
     _HAVE_HDBSCAN = False
-
-from numba.typed import Dict
 
 
 def to_numpy_rec_array(named_tuple_tree):
@@ -137,28 +136,27 @@ def fast_hdbscan(
     data,
     data_labels=None,
     semi_supervised=False,
-    ss_algorithm=None,
+    ss_algorithm='bc',
     min_samples=10,
     min_cluster_size=10,
     cluster_selection_method="eom",
+    max_cluster_size=np.inf,
     allow_single_cluster=False,
     cluster_selection_epsilon=0.0,
+    cluster_selection_persistence=0.0,
     sample_weights=None,
     return_trees=False,
 ):
     data = check_array(data)
 
-    if semi_supervised and data_labels is None:
-        raise ValueError(
-            "data_labels must not be None when semi_supervised is set to True!"
-        )
-
+    # Detect parameter inconsistencies early.
     if semi_supervised:
-        label_indices = np.flatnonzero(data_labels > -1)
-        label_values = data_labels[label_indices]
-        data_labels_dict = Dict()
-        for index, label in zip(label_indices, label_values):
-            data_labels_dict[index] = label
+        if data_labels is None:
+            raise ValueError(
+                "data_labels must not be None when semi_supervised is set to True!"
+            )
+        if ss_algorithm not in ["bc", "bc_simple"]:
+            raise ValueError(f"Invalid ss_algorithm {ss_algorithm}")
 
     if (
         (not (np.issubdtype(type(min_samples), np.integer) or min_samples is None))
@@ -175,51 +173,100 @@ def fast_hdbscan(
         raise ValueError(
             "Cluster selection epsilon must be a positive floating point number!"
         )
+    if (
+        not np.issubdtype(type(cluster_selection_persistence), np.floating)
+        or cluster_selection_persistence < 0.0
+    ):
+        raise ValueError(
+            "Cluster selection persistence must be a positive floating point number!"
+        )
 
-    sklearn_tree = KDTree(data)
-    numba_tree = kdtree_to_numba(sklearn_tree)
-    edges = parallel_boruvka(
-        numba_tree,
+    minimum_spanning_tree, neighbors, core_distances = compute_minimum_spanning_tree(
+        data,
         min_samples=min_cluster_size if min_samples is None else min_samples,
         sample_weights=sample_weights,
     )
-    sorted_mst = edges[np.argsort(edges.T[2])]
+
+    return (
+        *clusters_from_spanning_tree(
+            minimum_spanning_tree,
+            data_labels=data_labels,
+            semi_supervised=semi_supervised,
+            ss_algorithm=ss_algorithm,
+            min_cluster_size=min_cluster_size,
+            cluster_selection_method=cluster_selection_method,
+            max_cluster_size=max_cluster_size,
+            allow_single_cluster=allow_single_cluster,
+            cluster_selection_epsilon=cluster_selection_epsilon,
+            cluster_selection_persistence=cluster_selection_persistence,
+            sample_weights=sample_weights,
+        ),
+        neighbors,
+        core_distances,
+    )[: (None if return_trees else 2)]
+
+
+def compute_minimum_spanning_tree(data, min_samples=10, sample_weights=None):
+    sklearn_tree = KDTree(data)
+    numba_tree = kdtree_to_numba(sklearn_tree)
+    edges, neighbors, core_distances = parallel_boruvka(
+        numba_tree, min_samples=min_samples, sample_weights=sample_weights
+    )
+    return edges, neighbors, core_distances
+
+
+def clusters_from_spanning_tree(
+    minimum_spanning_tree,
+    data_labels=None,
+    semi_supervised=False,
+    ss_algorithm='bc',
+    min_cluster_size=10,
+    cluster_selection_method="eom",
+    max_cluster_size=np.inf,
+    allow_single_cluster=False,
+    cluster_selection_epsilon=0.0,
+    cluster_selection_persistence=0.0,
+    sample_weights=None,
+):
+    n_points = minimum_spanning_tree.shape[0] + 1
+    sorted_mst = minimum_spanning_tree[np.argsort(minimum_spanning_tree.T[2])]
+    
     if sample_weights is None:
         linkage_tree = mst_to_linkage_tree(sorted_mst)
     else:
         linkage_tree = mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights)
-    condensed_tree = condense_tree(linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights)
-    if cluster_selection_epsilon > 0.0 or cluster_selection_method == "eom":
-        cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
-
+    
+    condensed_tree = condense_tree(
+        linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights
+    )
+    if cluster_selection_persistence > 0.0:
+        condensed_tree = simplify_hierarchy(
+            condensed_tree, n_points, cluster_selection_persistence
+        )
+    
+    cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
     if cluster_selection_method == "eom":
         if semi_supervised:
-            if ss_algorithm == "bc":
-                selected_clusters = extract_clusters_bcubed(
-                    condensed_tree,
-                    cluster_tree,
-                    data_labels_dict,
-                    allow_virtual_nodes=True,
-                    allow_single_cluster=allow_single_cluster,
-                )
-            elif ss_algorithm == "bc_without_vn":
-                selected_clusters = extract_clusters_bcubed(
-                    condensed_tree,
-                    cluster_tree,
-                    data_labels_dict,
-                    allow_virtual_nodes=False,
-                    allow_single_cluster=allow_single_cluster,
-                )
-            else:
-                raise ValueError(f"Invalid ss_algorithm {ss_algorithm}")
+            # Assumes ss_algorithm is either 'bc' or 'bc_simple'
+            selected_clusters = extract_clusters_bcubed(
+                condensed_tree,
+                cluster_tree,
+                data_labels,
+                allow_virtual_nodes=True if ss_algorithm == "bc" else False,
+                allow_single_cluster=allow_single_cluster,
+            )
         else:
             selected_clusters = extract_eom_clusters(
-                condensed_tree, cluster_tree, allow_single_cluster=allow_single_cluster
+                condensed_tree,
+                cluster_tree,
+                max_cluster_size=max_cluster_size,
+                allow_single_cluster=allow_single_cluster,
             )
     elif cluster_selection_method == "leaf":
-        selected_clusters = extract_leaves(
-            condensed_tree, allow_single_cluster=allow_single_cluster
-        )
+        if cluster_tree.parent.shape[0] == 0:
+            selected_clusters = np.empty(0, dtype=np.int64)
+        else:
+            selected_clusters = cluster_tree_leaves(cluster_tree, n_points)
     else:
         raise ValueError(f"Invalid cluster_selection_method {cluster_selection_method}")
 
@@ -227,22 +274,20 @@ def fast_hdbscan(
         selected_clusters = cluster_epsilon_search(
             selected_clusters,
             cluster_tree,
-            min_persistence=cluster_selection_epsilon,
+            min_epsilon=cluster_selection_epsilon,
         )
 
     clusters = get_cluster_label_vector(
         condensed_tree,
         selected_clusters,
         cluster_selection_epsilon,
-        n_samples=data.shape[0],
+        n_samples=n_points
     )
     membership_strengths = get_point_membership_strength_vector(
         condensed_tree, selected_clusters, clusters
     )
 
-    if return_trees:
-        return clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst
-    return clusters, membership_strengths
+    return clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst
 
 
 class HDBSCAN(BaseEstimator, ClusterMixin):
@@ -253,16 +298,20 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         min_samples=None,
         cluster_selection_method="eom",
         allow_single_cluster=False,
+        max_cluster_size=np.inf,
         cluster_selection_epsilon=0.0,
+        cluster_selection_persistence=0.0,
         semi_supervised=False,
-        ss_algorithm=None,
+        ss_algorithm='bc',
         **kwargs,
     ):
         self.min_cluster_size = min_cluster_size
         self.min_samples = min_samples
         self.cluster_selection_method = cluster_selection_method
         self.allow_single_cluster = allow_single_cluster
+        self.max_cluster_size = max_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
+        self.cluster_selection_persistence = cluster_selection_persistence
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
 
@@ -270,8 +319,6 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
 
         if self.semi_supervised:
             X, y = check_X_y(X, y, accept_sparse="csr", ensure_all_finite=False)
-            if sample_weight is not None:
-                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
             self._raw_labels = y
             # Replace non-finite labels with -1 labels
             y[~np.isfinite(y)] = -1
@@ -282,9 +329,9 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
                 )
         else:
             X = check_array(X, accept_sparse="csr", ensure_all_finite=False)
-            if sample_weight is not None:
-                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
             self._raw_data = X
+        if sample_weight is not None:
+            sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
 
         self._all_finite = np.all(np.isfinite(X))
         if ~self._all_finite:
@@ -292,10 +339,8 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             # We will later assign all non-finite points to the background -1 cluster
             finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
             clean_data = X[finite_index]
-            clean_data_labels = y
-
-            if self.semi_supervised:
-                clean_data_labels = y[finite_index]
+            clean_data_labels = y[finite_index] if self.semi_supervised else None
+            sample_weight = sample_weight[finite_index] if sample_weight is not None else None
 
             internal_to_raw = {
                 x: y for x, y in zip(range(len(finite_index)), finite_index)
@@ -313,6 +358,8 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             self._single_linkage_tree,
             self._condensed_tree,
             self._min_spanning_tree,
+            self._neighbors,
+            self._core_distances
         ) = fast_hdbscan(
             clean_data,
             clean_data_labels,
@@ -363,8 +410,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         if self._condensed_tree is not None:
             return CondensedTree(
                 self._condensed_tree,
-                self.cluster_selection_method,
-                self.allow_single_cluster,
+                self.labels_,
             )
         else:
             raise AttributeError(
