@@ -14,10 +14,10 @@ def select_components(candidate_distances, candidate_neighbors, point_components
         zip(candidate_distances, candidate_neighbors, point_components)
     ):
         if from_component in component_edges:
-            if distance < component_edges[from_component][2]:
-                component_edges[from_component] = (parent, neighbor, distance)
+            if distance < component_edges[np.int64(from_component)][2]:
+                component_edges[np.int64(from_component)] = (parent, neighbor, distance)
         else:
-            component_edges[from_component] = (parent, neighbor, distance)
+            component_edges[np.int64(from_component)] = (parent, neighbor, distance)
 
     return component_edges
 
