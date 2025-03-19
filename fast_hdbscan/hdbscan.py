@@ -2,7 +2,7 @@ import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_array, check_X_y
-from sklearn.utils.validation import check_is_fitted, _check_sample_weight
+from sklearn.utils.validation import check_is_fitted, _check_sample_weight, validate_data
 from sklearn.neighbors import KDTree
 
 from warnings import warn
@@ -329,7 +329,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
                     "y must contain at least one label > -1. Currently it only contains -1 and/or non-finite labels!"
                 )
         else:
-            X = self._validate_data(X, accept_sparse="csr", ensure_all_finite=False)
+            X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
             self._raw_data = X
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
@@ -475,7 +475,7 @@ class LayerClustering(ClusterMixin, BaseEstimator):
         self.verbose = verbose
 
     def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
-        X = self._validate_data(X, accept_sparse="csr", ensure_all_finite=False)
+        X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
         self._raw_data = X
 
         if sample_weight is not None:
