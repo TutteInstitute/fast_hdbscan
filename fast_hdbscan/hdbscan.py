@@ -2,7 +2,7 @@ import numpy as np
 
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_array, check_X_y
-from sklearn.utils.validation import check_is_fitted, _check_sample_weight
+from sklearn.utils.validation import check_is_fitted, _check_sample_weight, validate_data
 from sklearn.neighbors import KDTree
 
 from warnings import warn
@@ -23,6 +23,7 @@ from .cluster_trees import (
     cluster_tree_from_condensed_tree,
     extract_clusters_bcubed,
 )
+from .layer_clusters import build_raw_cluster_layers, build_layer_cluster_tree
 
 try:
     from hdbscan.plots import CondensedTree, SingleLinkageTree, MinimumSpanningTree
@@ -229,7 +230,7 @@ def clusters_from_spanning_tree(
     sample_weights=None,
 ):
     n_points = minimum_spanning_tree.shape[0] + 1
-    sorted_mst = minimum_spanning_tree[np.argsort(minimum_spanning_tree.T[2])]
+    sorted_mst = minimum_spanning_tree[np.lexsort((minimum_spanning_tree.T[1], minimum_spanning_tree.T[0], minimum_spanning_tree.T[2]))]
     
     if sample_weights is None:
         linkage_tree = mst_to_linkage_tree(sorted_mst)
@@ -290,7 +291,7 @@ def clusters_from_spanning_tree(
     return clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst
 
 
-class HDBSCAN(BaseEstimator, ClusterMixin):
+class HDBSCAN(ClusterMixin, BaseEstimator):
     def __init__(
         self,
         *,
@@ -303,7 +304,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         cluster_selection_persistence=0.0,
         semi_supervised=False,
         ss_algorithm='bc',
-        **kwargs,
+        # Removed **kwargs to comply with scikit-learn's API requirements
     ):
         self.min_cluster_size = min_cluster_size
         self.min_samples = min_samples
@@ -328,7 +329,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
                     "y must contain at least one label > -1. Currently it only contains -1 and/or non-finite labels!"
                 )
         else:
-            X = check_array(X, accept_sparse="csr", ensure_all_finite=False)
+            X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
             self._raw_data = X
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
@@ -452,3 +453,55 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
             raise AttributeError(
                 "No minimum spanning tree was generated; try running fit first."
             )
+
+
+class LayerClustering(ClusterMixin, BaseEstimator):
+
+    def __init__(
+        self,
+        *,
+        min_clusters=3,
+        min_samples=5,
+        base_min_cluster_size=10,
+        base_n_clusters=None,
+        next_cluster_size_quantile=0.8,
+        verbose=False,
+    ):
+        self.min_clusters = min_clusters
+        self.min_samples = min_samples
+        self.base_min_cluster_size = base_min_cluster_size
+        self.base_n_clusters = base_n_clusters
+        self.next_cluster_size_quantile = next_cluster_size_quantile
+        self.verbose = verbose
+
+    def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
+        X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
+        self._raw_data = X
+
+        if sample_weight is not None:
+            sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
+
+        kwargs = self.get_params()
+
+        self.cluster_layers_ = build_raw_cluster_layers(
+            X,
+            sample_weights=sample_weight,
+            **kwargs,
+        )
+        self.cluster_tree_ = build_layer_cluster_tree(self.cluster_layers_)
+
+        if len(self.cluster_layers_) == 1:
+            self.labels_ = self.cluster_layers_[0]
+        else:
+            n_points_clustered_per_layer = [
+                np.sum(layer >= 0) for layer in self.cluster_layers_
+            ]
+            best_layer = np.argmax(n_points_clustered_per_layer)
+            self.labels_ = self.cluster_layers_[best_layer]
+
+        return self.labels_
+    
+    def fit(self, X, y=None, sample_weight=None, **fit_params):
+        _ = self.fit_predict(X, y=y, sample_weight=sample_weight, **fit_params)
+        return self
+
