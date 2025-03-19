@@ -224,7 +224,7 @@ def test_mst_entry():
 
 
 # Disable for now -- need to refactor to meet newer standards
-@pytest.mark.skip(reason="need to refactor to meet newer standards")
+@pytest.mark.skip(reason="We accept NaNs in the input data")
 def test_hdbscan_is_sklearn_estimator():
     check_estimator(HDBSCAN())
 

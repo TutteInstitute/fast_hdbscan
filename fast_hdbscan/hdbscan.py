@@ -229,7 +229,7 @@ def clusters_from_spanning_tree(
     sample_weights=None,
 ):
     n_points = minimum_spanning_tree.shape[0] + 1
-    sorted_mst = minimum_spanning_tree[np.argsort(minimum_spanning_tree.T[2])]
+    sorted_mst = minimum_spanning_tree[np.lexsort((minimum_spanning_tree.T[1], minimum_spanning_tree.T[0], minimum_spanning_tree.T[2]))]
     
     if sample_weights is None:
         linkage_tree = mst_to_linkage_tree(sorted_mst)
@@ -290,7 +290,7 @@ def clusters_from_spanning_tree(
     return clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst
 
 
-class HDBSCAN(BaseEstimator, ClusterMixin):
+class HDBSCAN(ClusterMixin, BaseEstimator):
     def __init__(
         self,
         *,
@@ -303,7 +303,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
         cluster_selection_persistence=0.0,
         semi_supervised=False,
         ss_algorithm='bc',
-        **kwargs,
+        # Removed **kwargs to comply with scikit-learn's API requirements
     ):
         self.min_cluster_size = min_cluster_size
         self.min_samples = min_samples
@@ -328,7 +328,7 @@ class HDBSCAN(BaseEstimator, ClusterMixin):
                     "y must contain at least one label > -1. Currently it only contains -1 and/or non-finite labels!"
                 )
         else:
-            X = check_array(X, accept_sparse="csr", ensure_all_finite=False)
+            X = self._validate_data(X, accept_sparse="csr", ensure_all_finite=False)
             self._raw_data = X
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)

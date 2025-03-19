@@ -15,6 +15,18 @@ def kdtree_to_numba(sklearn_kdtree):
         "f4(f4[::1],f4[::1])",
         "f8(f8[::1],f8[::1])",
         "f8(f4[::1],f8[::1])",
+        numba.types.float32(
+            numba.types.Array(numba.types.float32, 1, "C", readonly=True),
+            numba.types.Array(numba.types.float32, 1, "C", readonly=True),
+        ),
+        numba.types.float64(
+            numba.types.Array(numba.types.float64, 1, "C", readonly=True),
+            numba.types.Array(numba.types.float64, 1, "C", readonly=True),
+        ),
+        numba.types.float64(
+            numba.types.Array(numba.types.float32, 1, "C", readonly=True),
+            numba.types.Array(numba.types.float64, 1, "C", readonly=True),
+        ),
     ],
     fastmath=True,
     locals={
@@ -37,6 +49,20 @@ def rdist(x, y):
         "f4(f4[::1],f4[::1],f4[::1])",
         "f4(f8[::1],f8[::1],f4[::1])",
         "f4(f8[::1],f8[::1],f8[::1])",
+        numba.types.float32(
+            numba.types.Array(numba.types.float32, 1, "C"),
+            numba.types.Array(numba.types.float32, 1, "C"),
+            numba.types.Array(numba.types.float32, 1, "C", readonly=True),
+        ),
+        numba.types.float64(
+            numba.types.Array(numba.types.float64, 1, "C"),
+            numba.types.Array(numba.types.float64, 1, "C"),
+            numba.types.Array(numba.types.float32, 1, "C", readonly=True),
+        ),        numba.types.float64(
+            numba.types.Array(numba.types.float64, 1, "C"),
+            numba.types.Array(numba.types.float64, 1, "C"),
+            numba.types.Array(numba.types.float64, 1, "C", readonly=True),
+        ),
     ],
     fastmath=True,
     locals={
@@ -210,7 +236,11 @@ def parallel_tree_query(tree, data, k=10, output_rdist=False):
     result = (np.full((data.shape[0], k), np.inf, dtype=np.float32), np.full((data.shape[0], k), -1, dtype=np.int32))
 
     for i in numba.prange(data.shape[0]):
-        distance_lower_bound = point_to_node_lower_bound_rdist(tree.node_bounds[0, 0], tree.node_bounds[1, 0], data[i])
+        distance_lower_bound = point_to_node_lower_bound_rdist(
+            tree.node_bounds[0, 0].astype(np.float64),
+            tree.node_bounds[1, 0].astype(np.float64),
+            data[i].astype(np.float64)
+        )
         heap_priorities, heap_indices = result[0][i], result[1][i]
         tree_query_recursion(tree, 0, data[i], heap_priorities, heap_indices, distance_lower_bound)
 
