@@ -87,6 +87,13 @@ The algorithm used here is an adaptation of the algorithms described in the pape
     In: Advances in Knowledge Discovery and Data Mining, Springer, pp 160-172.
     2013
 
+The branch-detection functionality is adapted from:
+
+    D.M. Bot, J. Peeters, J. Liesenborgs, J. Aerts. 
+    *FLASC: a flare-sensitive clustering algorithm.*
+    In: PeerJ Computer Science, Volume 11, e2792, 2025.
+    https://doi.org/10.7717/peerj-cs.2792.
+
 -------
 License
 -------
