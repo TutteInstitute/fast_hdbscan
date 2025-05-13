@@ -240,9 +240,9 @@ def clusters_from_spanning_tree(
     condensed_tree = condense_tree(
         linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights
     )
-    if cluster_selection_persistence > 0.0:
+    if cluster_selection_persistence > 0.0 and len(condensed_tree.parent) > 0:
         condensed_tree = simplify_hierarchy(
-            condensed_tree, n_points, cluster_selection_persistence
+            condensed_tree, cluster_selection_persistence
         )
     
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
