@@ -14,10 +14,12 @@ from sklearn.neighbors import KDTree
 
 from typing import NewType, List, Tuple, Dict, Optional
 
+from .variables import NUMBA_CACHE
+
 ClusterTree = NewType("ClusterTree", Dict[Tuple[int, int], List[Tuple[int, int]]])
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def binary_search_for_n_clusters(
     uncondensed_tree, approx_n_clusters, n_samples, sample_weights=None,
 ):  # pragma: no cover
@@ -171,7 +173,7 @@ def build_raw_cluster_layers(
     return cluster_layers
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def _build_cluster_tree(labels: np.ndarray) -> List[Tuple[int, int, int, int]]:
 
     mapping = [(-1, -1, -1, -1) for _ in range(0)]

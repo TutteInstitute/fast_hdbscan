@@ -2,22 +2,23 @@ import numba
 import numpy as np
 
 from collections import namedtuple
+from .variables import NUMBA_CACHE
 
 RankDisjointSet = namedtuple("DisjointSet", ["parent", "rank"])
 SizeDisjointSet = namedtuple("DisjointSet", ["parent", "size"])
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def ds_rank_create(n_elements):
     return RankDisjointSet(np.arange(n_elements, dtype=np.int32), np.zeros(n_elements, dtype=np.int32))
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def ds_size_create(n_elements):
     return SizeDisjointSet(np.arange(n_elements, dtype=np.int32), np.ones(n_elements, dtype=np.int32))
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def ds_find(disjoint_set, x):
     while disjoint_set.parent[x] != x:
         x, disjoint_set.parent[x] = disjoint_set.parent[x], disjoint_set.parent[disjoint_set.parent[x]]
@@ -25,7 +26,7 @@ def ds_find(disjoint_set, x):
     return x
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def ds_union_by_rank(disjoint_set, x, y):
     x = ds_find(disjoint_set, x)
     y = ds_find(disjoint_set, y)
@@ -41,7 +42,7 @@ def ds_union_by_rank(disjoint_set, x, y):
         disjoint_set.rank[x] += 1
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def ds_union_by_size(disjoint_set, x, y):
     x = ds_find(disjoint_set, x)
     y = ds_find(disjoint_set, y)

@@ -3,6 +3,7 @@ import numpy as np
 
 from collections import namedtuple
 
+from .variables import NUMBA_CACHE
 from .disjoint_set import ds_rank_create, ds_find, ds_union_by_rank
 
 from numba.typed import Dict, List
@@ -13,7 +14,7 @@ int64_list_type = ListType(int64)
 LinkageMergeData = namedtuple("LinkageMergeData", ["parent", "size", "next"])
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def create_linkage_merge_data(base_size):
     parent = np.full(2 * base_size - 1, -1, dtype=np.intp)
     size = np.concatenate((np.ones(base_size, dtype=np.intp), np.zeros(base_size - 1, dtype=np.intp)))
@@ -22,7 +23,7 @@ def create_linkage_merge_data(base_size):
     return LinkageMergeData(parent, size, next_parent)
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def create_linkage_merge_data_w_sample_weights(sample_weights):
     base_size = sample_weights.shape[0]
     parent = np.full(2 * base_size - 1, -1, dtype=np.intp)
@@ -32,7 +33,7 @@ def create_linkage_merge_data_w_sample_weights(sample_weights):
     return LinkageMergeData(parent, size, next_parent)
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def linkage_merge_find(linkage_merge, node):
     relabel = node
     while linkage_merge.parent[node] != -1 and linkage_merge.parent[node] != node:
@@ -49,7 +50,7 @@ def linkage_merge_find(linkage_merge, node):
     return node
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def linkage_merge_join(linkage_merge, left, right):
     linkage_merge.size[linkage_merge.next[0]] = linkage_merge.size[left] + linkage_merge.size[right]
     linkage_merge.parent[left] = linkage_merge.next[0]
@@ -57,7 +58,7 @@ def linkage_merge_join(linkage_merge, left, right):
     linkage_merge.next[0] += 1
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def mst_to_linkage_tree(sorted_mst):
     result = np.empty((sorted_mst.shape[0], sorted_mst.shape[1] + 1))
 
@@ -88,7 +89,7 @@ def mst_to_linkage_tree(sorted_mst):
     return result
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights):
     result = np.empty((sorted_mst.shape[0], sorted_mst.shape[1] + 1))
 
@@ -118,7 +119,7 @@ def mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights):
     return result
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def bfs_from_hierarchy(hierarchy, bfs_root, num_points):
     to_process = [bfs_root]
     result = []
@@ -136,7 +137,7 @@ def bfs_from_hierarchy(hierarchy, bfs_root, num_points):
     return result
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def eliminate_branch(branch_node, parent_node, lambda_value, parents, children, lambdas, sizes, idx, ignore, hierarchy,
                      num_points):
     if branch_node < num_points:
@@ -160,14 +161,14 @@ def eliminate_branch(branch_node, parent_node, lambda_value, parents, children, 
 CondensedTree = namedtuple('CondensedTree', ['parent', 'child', 'lambda_val', 'child_size'])
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def empty_condensed_tree():
     parents = np.empty(shape=0, dtype=np.intp)
     others = np.empty(shape=0, dtype=np.float32)
     return CondensedTree(parents, parents, others, others)
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, cache=NUMBA_CACHE)
 def condense_tree(hierarchy, min_cluster_size=10, max_cluster_size=np.inf, sample_weights=None):
     root = 2 * hierarchy.shape[0]
     num_points = hierarchy.shape[0] + 1
@@ -256,7 +257,7 @@ def condense_tree(hierarchy, min_cluster_size=10, max_cluster_size=np.inf, sampl
     return CondensedTree(parents[:idx], children[:idx], lambdas[:idx], sizes[:idx])
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def extract_leaves(condensed_tree, allow_single_cluster=True):
     n_nodes = condensed_tree.parent.max() + 1
     n_points = condensed_tree.parent.min()
@@ -270,7 +271,7 @@ def extract_leaves(condensed_tree, allow_single_cluster=True):
     return np.nonzero(leaf_indicator)[0]
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def cluster_tree_leaves(cluster_tree, n_points):
     n_nodes = cluster_tree.child.max() + 1
     leaf_indicator = np.ones(n_nodes - n_points, dtype=np.bool_)
@@ -282,7 +283,7 @@ def cluster_tree_leaves(cluster_tree, n_points):
 # in Castro Gertrudes, J., Zimek, A., Sander, J. et al. A unified view of density-based methods 
 # for semi-supervised clustering and classification. Data Min Knowl Disc 33, 1894–1952 (2019).
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def cluster_tree_from_condensed_tree_bcubed(condensed_tree, cluster_tree, label_indices):
     # This functions returns a cluster_tree with virtual nodes (if applicable).
 
@@ -303,7 +304,7 @@ def cluster_tree_from_condensed_tree_bcubed(condensed_tree, cluster_tree, label_
                          condensed_tree.child_size[mask])
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def get_condensed_tree_clusters_bcubed(condensed_tree, label_indices, cluster_tree=None, cluster_tree_bcubed=None, allow_virtual_nodes=False):
 
     cluster_elements = Dict.empty(
@@ -341,7 +342,7 @@ def get_condensed_tree_clusters_bcubed(condensed_tree, label_indices, cluster_tr
     return cluster_elements, np.array(virtual_nodes)
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def eom_recursion_bcubed(node, cluster_tree, stability_node_scores, bcubed_node_scores, selected_clusters, unselected_nodes):
 
     current_score_stability_bcubed = np.array([stability_node_scores[node], bcubed_node_scores[node]], dtype=np.float32)
@@ -371,7 +372,7 @@ def eom_recursion_bcubed(node, cluster_tree, stability_node_scores, bcubed_node_
             return current_score_stability_bcubed
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def score_condensed_tree_nodes_bcubed(cluster_elements, label_indices): 
 
     label_values = label_indices.values()
@@ -413,7 +414,7 @@ def score_condensed_tree_nodes_bcubed(cluster_elements, label_indices):
                 bcubed[cluster] += num_points*(2.0/(1.0/precision_point + 1.0/recall_point))
     return bcubed
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def unselect_below_node_bcubed(node, cluster_tree, selected_clusters, unselected_nodes):
     
     for child in cluster_tree.child[cluster_tree.parent == node]:
@@ -422,7 +423,7 @@ def unselect_below_node_bcubed(node, cluster_tree, selected_clusters, unselected
             selected_clusters[child] = False
             unselected_nodes[child] = True
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def extract_clusters_bcubed(condensed_tree, cluster_tree, data_labels, allow_virtual_nodes=False, allow_single_cluster=False):
     label_indices = Dict()
     for index in np.flatnonzero(data_labels > -1):
@@ -462,7 +463,7 @@ def extract_clusters_bcubed(condensed_tree, cluster_tree, data_labels, allow_vir
     return np.asarray([node for node, selected in selected_clusters.items() if (selected and (node not in virtual_nodes))])
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def score_condensed_tree_nodes(condensed_tree):
     root = condensed_tree.parent[0]
     result = {root: np.float32(0.0)}
@@ -478,12 +479,12 @@ def score_condensed_tree_nodes(condensed_tree):
     return result
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def cluster_tree_from_condensed_tree(condensed_tree):
     return mask_condensed_tree(condensed_tree, condensed_tree.child_size > 1)
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def mask_condensed_tree(condensed_tree, mask):
     return CondensedTree(
         condensed_tree.parent[mask], 
@@ -493,14 +494,14 @@ def mask_condensed_tree(condensed_tree, mask):
     )
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def unselect_below_node(node, cluster_tree, selected_clusters):
     for child in cluster_tree.child[cluster_tree.parent == node]:
         unselect_below_node(child, cluster_tree, selected_clusters)
         selected_clusters[child] = False
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, cache=NUMBA_CACHE)
 def eom_recursion(node, cluster_tree, node_scores, node_sizes, selected_clusters, max_cluster_size):
     current_score = max(node_scores[node], 0.0) # floating point errors can make score negative!
     current_size = node_sizes[node]
@@ -519,7 +520,7 @@ def eom_recursion(node, cluster_tree, node_scores, node_sizes, selected_clusters
         return current_score
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def extract_eom_clusters(condensed_tree, cluster_tree, max_cluster_size=np.inf, allow_single_cluster=False):
     node_scores = score_condensed_tree_nodes(condensed_tree)
     if len(cluster_tree.parent) > 0:
@@ -544,7 +545,7 @@ def extract_eom_clusters(condensed_tree, cluster_tree, max_cluster_size=np.inf, 
     return np.asarray([node for node, selected in selected_clusters.items() if selected])
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def simplify_hierarchy(condensed_tree, persistence_threshold):
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
     n_points = condensed_tree.parent[0]
@@ -604,7 +605,7 @@ def simplify_hierarchy(condensed_tree, persistence_threshold):
     return mask_condensed_tree(condensed_tree, keep_mask)
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def cluster_epsilon_search(clusters, cluster_tree, min_epsilon=0.0):
     selected = list()
     # only way to create a typed empty set
@@ -631,7 +632,7 @@ def cluster_epsilon_search(clusters, cluster_tree, min_epsilon=0.0):
     return np.asarray(selected)
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def traverse_upwards(cluster_tree, min_epsilon, root, segment):
     parent = cluster_tree.parent[cluster_tree.child == segment][0]
     if parent == root:
@@ -643,7 +644,7 @@ def traverse_upwards(cluster_tree, min_epsilon, root, segment):
         return traverse_upwards(cluster_tree, min_epsilon, root, parent)
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def segments_in_branch(parents, children, segment):
     # only way to create a typed empty set
     child_set = {np.int64(0)}
@@ -668,7 +669,7 @@ def segments_in_branch(parents, children, segment):
     return result
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def get_cluster_labelling_at_cut(linkage_tree, cut, min_cluster_size):
 
     root = 2 * linkage_tree.shape[0]
@@ -705,7 +706,7 @@ def get_cluster_labelling_at_cut(linkage_tree, cut, min_cluster_size):
 
     return result
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def get_cluster_label_vector(
         tree,
         clusters,
@@ -752,7 +753,7 @@ def get_cluster_label_vector(
     return result
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def max_lambdas(tree, clusters):
     result = {c: 0.0 for c in clusters}
 
@@ -764,7 +765,7 @@ def max_lambdas(tree, clusters):
     return result
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def get_point_membership_strength_vector(tree, clusters, labels):
     result = np.zeros(labels.shape[0], dtype=np.float32)
     deaths = max_lambdas(tree, set(clusters))
