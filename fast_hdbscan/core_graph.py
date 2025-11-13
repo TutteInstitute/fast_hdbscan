@@ -6,11 +6,12 @@ from .disjoint_set import ds_rank_create
 from .hdbscan import clusters_from_spanning_tree
 from .cluster_trees import empty_condensed_tree
 from .boruvka import merge_components, update_point_components
+from .variables import NUMBA_CACHE
 
 CoreGraph = namedtuple("CoreGraph", ["weights", "distances", "indices", "indptr"])
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def knn_mst_union(neighbors, core_distances, min_spanning_tree, lens_values):
     # List of dictionaries of child: (weight, distance)
     graph = [
@@ -43,7 +44,7 @@ def knn_mst_union(neighbors, core_distances, min_spanning_tree, lens_values):
     return graph
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def flatten_to_csr(graph):
     # Count children to form indptr
     num_points = len(graph)
@@ -68,7 +69,7 @@ def flatten_to_csr(graph):
     return CoreGraph(weights, distances, indices, indptr)
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def sort_by_lens(graph):
     new_weights = np.empty_like(graph.weights)
     new_distances = np.empty_like(graph.distances)
@@ -88,7 +89,7 @@ def sort_by_lens(graph):
     return CoreGraph(new_weights, new_distances, new_indices, graph.indptr)
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def apply_lens(core_graph, lens_values):
     # Apply new lens to the graph
     for point in numba.prange(len(lens_values)):
@@ -100,7 +101,7 @@ def apply_lens(core_graph, lens_values):
     return sort_by_lens(core_graph)
 
 
-@numba.njit(locals={"parent": numba.types.int32})
+@numba.njit(locals={"parent": numba.types.int32}, cache=NUMBA_CACHE)
 def select_components(distances, indices, indptr, point_components):
     component_edges = {
         np.int64(0): (np.int32(0), np.int32(1), np.float32(0.0)) for _ in range(0)
@@ -123,7 +124,7 @@ def select_components(distances, indices, indptr, point_components):
     return component_edges
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def update_graph_components(distances, indices, indptr, point_components):
     for point in numba.prange(len(point_components)):
         counter = 0
@@ -141,7 +142,7 @@ def update_graph_components(distances, indices, indptr, point_components):
         distances[start + counter : end] = np.inf
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def minimum_spanning_tree(graph, overwrite=False):
     """
     Implements Boruvka on lod-style graph with multiple connected components.
@@ -180,7 +181,7 @@ def minimum_spanning_tree(graph, overwrite=False):
     return n_components, point_components, result
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def core_graph_spanning_tree(neighbors, core_distances, min_spanning_tree, lens):
     graph = sort_by_lens(
         flatten_to_csr(
