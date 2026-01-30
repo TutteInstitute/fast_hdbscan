@@ -1,13 +1,19 @@
 import numpy as np
+import numba
 
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_array, check_X_y
-from sklearn.utils.validation import check_is_fitted, _check_sample_weight, validate_data
+from sklearn.utils.validation import (
+    check_is_fitted,
+    _check_sample_weight,
+    validate_data,
+)
 from sklearn.neighbors import KDTree
 
 from warnings import warn
+from typing import Optional
 
-from .numba_kdtree import kdtree_to_numba
+from .numba_kdtree import kdtree_to_numba, build_kdtree
 from .boruvka import parallel_boruvka
 from .cluster_trees import (
     mst_to_linkage_tree,
@@ -23,7 +29,7 @@ from .cluster_trees import (
     cluster_tree_from_condensed_tree,
     extract_clusters_bcubed,
 )
-from .layer_clusters import build_raw_cluster_layers, build_layer_cluster_tree
+from .layer_clusters import build_cluster_layers, build_layer_cluster_tree
 
 try:
     from hdbscan.plots import CondensedTree, SingleLinkageTree, MinimumSpanningTree
@@ -137,7 +143,7 @@ def fast_hdbscan(
     data,
     data_labels=None,
     semi_supervised=False,
-    ss_algorithm='bc',
+    ss_algorithm="bc",
     min_samples=10,
     min_cluster_size=10,
     cluster_selection_method="eom",
@@ -146,6 +152,7 @@ def fast_hdbscan(
     cluster_selection_epsilon=0.0,
     cluster_selection_persistence=0.0,
     sample_weights=None,
+    reproducible=False,
     return_trees=False,
 ):
     data = check_array(data)
@@ -186,6 +193,7 @@ def fast_hdbscan(
         data,
         min_samples=min_cluster_size if min_samples is None else min_samples,
         sample_weights=sample_weights,
+        reproducible=reproducible,
     )
 
     return (
@@ -207,11 +215,17 @@ def fast_hdbscan(
     )[: (None if return_trees else 2)]
 
 
-def compute_minimum_spanning_tree(data, min_samples=10, sample_weights=None):
-    sklearn_tree = KDTree(data)
-    numba_tree = kdtree_to_numba(sklearn_tree)
+def compute_minimum_spanning_tree(
+    data, min_samples=10, sample_weights=None, reproducible=False
+):
+    n_threads = numba.get_num_threads()
+    numba_tree = build_kdtree(data)
     edges, neighbors, core_distances = parallel_boruvka(
-        numba_tree, min_samples=min_samples, sample_weights=sample_weights
+        numba_tree,
+        n_threads,
+        min_samples=min_samples,
+        sample_weights=sample_weights,
+        reproducible=reproducible,
     )
     return edges, neighbors, core_distances
 
@@ -220,7 +234,7 @@ def clusters_from_spanning_tree(
     minimum_spanning_tree,
     data_labels=None,
     semi_supervised=False,
-    ss_algorithm='bc',
+    ss_algorithm="bc",
     min_cluster_size=10,
     cluster_selection_method="eom",
     max_cluster_size=np.inf,
@@ -230,13 +244,21 @@ def clusters_from_spanning_tree(
     sample_weights=None,
 ):
     n_points = minimum_spanning_tree.shape[0] + 1
-    sorted_mst = minimum_spanning_tree[np.lexsort((minimum_spanning_tree.T[1], minimum_spanning_tree.T[0], minimum_spanning_tree.T[2]))]
-    
+    sorted_mst = minimum_spanning_tree[
+        np.lexsort(
+            (
+                minimum_spanning_tree.T[1],
+                minimum_spanning_tree.T[0],
+                minimum_spanning_tree.T[2],
+            )
+        )
+    ]
+
     if sample_weights is None:
         linkage_tree = mst_to_linkage_tree(sorted_mst)
     else:
         linkage_tree = mst_to_linkage_tree_w_sample_weights(sorted_mst, sample_weights)
-    
+
     condensed_tree = condense_tree(
         linkage_tree, min_cluster_size=min_cluster_size, sample_weights=sample_weights
     )
@@ -244,7 +266,7 @@ def clusters_from_spanning_tree(
         condensed_tree = simplify_hierarchy(
             condensed_tree, cluster_selection_persistence
         )
-    
+
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
     if cluster_selection_method == "eom":
         if semi_supervised:
@@ -279,10 +301,7 @@ def clusters_from_spanning_tree(
         )
 
     clusters = get_cluster_label_vector(
-        condensed_tree,
-        selected_clusters,
-        cluster_selection_epsilon,
-        n_samples=n_points
+        condensed_tree, selected_clusters, cluster_selection_epsilon, n_samples=n_points
     )
     membership_strengths = get_point_membership_strength_vector(
         condensed_tree, selected_clusters, clusters
@@ -303,7 +322,8 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         cluster_selection_epsilon=0.0,
         cluster_selection_persistence=0.0,
         semi_supervised=False,
-        ss_algorithm='bc',
+        ss_algorithm="bc",
+        reproducible=False,
         # Removed **kwargs to comply with scikit-learn's API requirements
     ):
         self.min_cluster_size = min_cluster_size
@@ -315,6 +335,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.cluster_selection_persistence = cluster_selection_persistence
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
+        self.reproducible = reproducible
 
     def fit(self, X, y=None, sample_weight=None, **fit_params):
 
@@ -341,7 +362,9 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
             clean_data = X[finite_index]
             clean_data_labels = y[finite_index] if self.semi_supervised else None
-            sample_weight = sample_weight[finite_index] if sample_weight is not None else None
+            sample_weight = (
+                sample_weight[finite_index] if sample_weight is not None else None
+            )
 
             internal_to_raw = {
                 x: y for x, y in zip(range(len(finite_index)), finite_index)
@@ -360,7 +383,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             self._condensed_tree,
             self._min_spanning_tree,
             self._neighbors,
-            self._core_distances
+            self._core_distances,
         ) = fast_hdbscan(
             clean_data,
             clean_data_labels,
@@ -455,24 +478,50 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             )
 
 
-class LayerClustering(ClusterMixin, BaseEstimator):
+class PLSCAN(ClusterMixin, BaseEstimator):
 
     def __init__(
         self,
         *,
-        min_clusters=3,
-        min_samples=5,
-        base_min_cluster_size=10,
-        base_n_clusters=None,
-        next_cluster_size_quantile=0.8,
+        min_samples: int = 5,
+        max_layers: int = 10,
+        base_min_cluster_size: int = 10,
+        base_n_clusters: Optional[int] = None,
+        layer_similarity_threshold: float = 0.2,
+        reproducible: bool = False,
         verbose=False,
     ):
-        self.min_clusters = min_clusters
         self.min_samples = min_samples
+        self.max_layers = max_layers
         self.base_min_cluster_size = base_min_cluster_size
         self.base_n_clusters = base_n_clusters
-        self.next_cluster_size_quantile = next_cluster_size_quantile
+        self.layer_similarity_threshold = layer_similarity_threshold
+        self.reproducible = reproducible
         self.verbose = verbose
+
+        self._validate_params()
+
+    def _validate_params(self):
+        if (
+            not np.issubdtype(type(self.min_samples), np.integer)
+        ) or self.min_samples <= 0:
+            raise ValueError("Min samples must be a positive integer!")
+
+        if (
+            not np.issubdtype(type(self.max_layers), np.integer)
+        ) or self.max_layers <= 0:
+            raise ValueError("Max layers must be a positive integer!")
+
+        if (
+            not np.issubdtype(type(self.base_min_cluster_size), np.integer)
+        ) or self.base_min_cluster_size <= 0:
+            raise ValueError("Base min cluster size must be a positive integer!")
+
+        if self.base_n_clusters is not None:
+            if (
+                not np.issubdtype(type(self.base_n_clusters), np.integer)
+            ) or self.base_n_clusters <= 0:
+                raise ValueError("Base n clusters must be a positive integer!")
 
     def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
         X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
@@ -483,7 +532,13 @@ class LayerClustering(ClusterMixin, BaseEstimator):
 
         kwargs = self.get_params()
 
-        self.cluster_layers_ = build_raw_cluster_layers(
+        (
+            self.cluster_layers_,
+            self.membership_strength_layers_,
+            self.layer_persistence_scores_,
+            self.min_cluster_sizes_,
+            self.total_persistence_,
+        ) = build_cluster_layers(
             X,
             sample_weights=sample_weight,
             **kwargs,
@@ -493,15 +548,12 @@ class LayerClustering(ClusterMixin, BaseEstimator):
         if len(self.cluster_layers_) == 1:
             self.labels_ = self.cluster_layers_[0]
         else:
-            n_points_clustered_per_layer = [
-                np.sum(layer >= 0) for layer in self.cluster_layers_
-            ]
-            best_layer = np.argmax(n_points_clustered_per_layer)
+            best_layer = np.argmax(self.layer_persistence_scores_)
             self.labels_ = self.cluster_layers_[best_layer]
+            self.membership_strengths_ = self.membership_strength_layers_[best_layer]
 
         return self.labels_
-    
+
     def fit(self, X, y=None, sample_weight=None, **fit_params):
         _ = self.fit_predict(X, y=y, sample_weight=sample_weight, **fit_params)
         return self
-
