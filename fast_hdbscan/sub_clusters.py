@@ -10,6 +10,7 @@ from sklearn.base import BaseEstimator, ClusterMixin
 
 from .hdbscan import to_numpy_rec_array
 from .core_graph import core_graph_clusters, core_graph_to_edge_list
+from .variables import NUMBA_CACHE
 
 
 def compute_sub_clusters_in_cluster(
@@ -127,7 +128,7 @@ def update_labels(
     return labels, probabilities, sub_labels, sub_probabilities, lens_values
 
 
-@numba.njit()
+@numba.njit(cache=NUMBA_CACHE)
 def propagate_labels_per_cluster(graph, sub_labels):
     # create undirected core graph
     undirected = [

@@ -16,6 +16,8 @@ from sklearn.neighbors import KDTree
 
 from typing import NewType, List, Tuple, Dict, Optional
 
+from .variables import NUMBA_CACHE
+
 ClusterTree = NewType("ClusterTree", Dict[Tuple[int, int], List[Tuple[int, int]]])
 
 
@@ -68,7 +70,7 @@ def find_peaks(x):
     return midpoints[:m]
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def _binary_search_for_n_clusters(uncondensed_tree, approx_n_clusters, n_samples):
     lower_bound_min_cluster_size = 2
     upper_bound_min_cluster_size = n_samples // 2
@@ -474,7 +476,7 @@ def build_cluster_layers(
     )
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def _build_cluster_tree(labels: np.ndarray) -> List[Tuple[int, int, int, int]]:
 
     mapping = [(-1, -1, -1, -1) for _ in range(0)]

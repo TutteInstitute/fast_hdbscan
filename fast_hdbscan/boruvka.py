@@ -8,9 +8,10 @@ from .numba_kdtree import (
     point_to_node_lower_bound_rdist,
     NumbaKDTree,
 )
+from .variables import NUMBA_CACHE
 
 
-@numba.njit(locals={"parent": numba.types.int32})
+@numba.njit(locals={"parent": numba.types.int32}, cache=NUMBA_CACHE)
 def select_components(candidate_distances, candidate_neighbors, point_components):
     component_edges = {
         np.int64(0): (np.int32(0), np.int32(1), np.float32(0.0)) for i in range(0)
@@ -29,7 +30,7 @@ def select_components(candidate_distances, candidate_neighbors, point_components
     return component_edges
 
 
-@numba.njit(locals={"i": numba.types.int64}, cache=True)
+@numba.njit(locals={"i": numba.types.int64}, cache=Truecache=NUMBA_CACHE)
 def merge_components(
     disjoint_set, candidate_neighbors, candidate_neighbor_distances, point_components
 ):
@@ -86,7 +87,7 @@ def merge_components(
         "candidate_component": numba.types.int32,
     },
     parallel=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     fastmath=True,
 )
 def update_component_vectors(tree, disjoint_set, node_components, point_components):
@@ -122,7 +123,7 @@ def update_component_vectors(tree, disjoint_set, node_components, point_componen
                 node_components[i] = node_components[left]
 
 
-@numba.njit(
+@numba.njit(cache=NUMBA_CACHE
     locals={
         "i": numba.types.int32,
         "idx": numba.types.int32,
@@ -278,7 +279,7 @@ def component_aware_query_recursion(
         "current_component": numba.types.int32,
     },
     parallel=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     fastmath=True,
 )
 def boruvka_tree_query(tree, node_components, point_components, core_distances):
@@ -458,7 +459,7 @@ def boruvka_tree_query_reproducible(
         "to_component": numba.types.int32,
     },
     parallel=True,
-    cache=True,
+    cache=NUMBA_CACHE,
 )
 def initialize_boruvka_from_knn(
     knn_indices, knn_distances, core_distances, disjoint_set
@@ -501,7 +502,7 @@ def initialize_boruvka_from_knn(
     return result[:result_idx]
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def sample_weight_core_distance(distances, neighbors, sample_weights, min_samples):
     core_distances = np.zeros(distances.shape[0], dtype=np.float32)
     for i in numba.prange(distances.shape[0]):

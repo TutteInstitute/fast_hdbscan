@@ -1,3 +1,35 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
+requires = ["setuptools>=61.2"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "fast_hdbscan"
+version = "0.2.2"
+authors = [{name = "Leland McInnes", email = "leland.mcinnes@gmail.com"}]
+maintainers = [{name = "Leland McInnes", email = "leland.mcinnes@gmail.com"}]
+description = "A fast multicore version of hdbscan for low dimensional euclidean spaces"
+readme = "README.rst"
+keywords = ["cluster", "clustering", "hdbscan", "dbscan"]
+license = "BSD-2-Clause"
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Development Status :: 4 - Beta",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.21",
+    "numba>=0.56",
+    "scikit-learn>=1.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/TutteInstitute/fast_hdbscan"
+
+[tool.setuptools]
+zip-safe = false
+packages = ["fast_hdbscan"]
+include-package-data = false

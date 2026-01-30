@@ -2,6 +2,7 @@ import numba
 import numpy as np
 
 from collections import namedtuple
+from .variables import NUMBA_CACHE
 
 NumbaKDTree = namedtuple(
     "KDTree",
@@ -516,6 +517,7 @@ def build_kdtree(data, leaf_size=40):
         "diff": numba.types.float32,
         "result": numba.types.float32,
     },
+    cache=NUMBA_CACHE,
 )
 def rdist(x, y):
     result = 0.0
@@ -543,6 +545,7 @@ def rdist(x, y):
         "d": numba.types.float32,
         "result": numba.types.float32,
     },
+    cache=NUMBA_CACHE,
 )
 def point_to_node_lower_bound_rdist(upper, lower, pt):
     result = 0.0
@@ -569,7 +572,7 @@ def point_to_node_lower_bound_rdist(upper, lower, pt):
         "ic2": numba.types.uint16,
         "i_swap": numba.types.uint16,
     },
-    cache=True,
+    cache=NUMBA_CACHE,
 )
 def simple_heap_push(priorities, indices, p, n):
     if p >= priorities[0]:
@@ -616,7 +619,7 @@ def simple_heap_push(priorities, indices, p, n):
     return 1
 
 
-@numba.njit(
+@numba.njit(cache=NUMBA_CACHE
     fastmath=True,
     cache=True,
     locals={
@@ -645,7 +648,7 @@ def siftdown(heap1, heap2, elt):
             elt = swap
 
 
-@numba.njit(parallel=True, cache=True)
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
 def deheap_sort(distances, indices):
     for i in numba.prange(indices.shape[0]):
         # starting from the end of the array and moving back
@@ -674,6 +677,7 @@ def deheap_sort(distances, indices):
         "dist_lower_bound_left": numba.types.float32,
         "dist_lower_bound_right": numba.types.float32,
     },
+    cache=NUMBA_CACHE,
 )
 def tree_query_recursion(
     tree,
@@ -736,9 +740,9 @@ def tree_query_recursion(
 
 
 @numba.njit(
-    parallel=True,
+    parallel=True, 
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "i": numba.types.intp,
         "distance_lower_bound": numba.types.float32,

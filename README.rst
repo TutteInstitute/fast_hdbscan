@@ -47,6 +47,8 @@ Euclidean data (e.g. the output of UMAP), you can use this library as a straight
     clusterer = fast_hdbscan.HDBSCAN(min_cluster_size=10)
     cluster_labels = clusterer.fit_predict(data)
 
+The first import of the package will take a while, as numba functions will be compiled for the first time. These functions are cached by default; you can tell numba to ignore the cache by setting the environment variable ``FAST_HDBSCAN_NUMBA_CACHE`` to 'false'.
+
 ------------
 Installation
 ------------
