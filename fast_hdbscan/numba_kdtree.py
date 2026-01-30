@@ -47,7 +47,7 @@ def kdtree_to_numba(sklearn_kdtree):
 
 
 @numba.njit(
-    cache=True,
+    cache=NUMBA_CACHE,
     fastmath=True,
     locals={
         "n_features": numba.types.intp,
@@ -99,7 +99,7 @@ def _init_node(
 
 @numba.njit(
     "intp(float32[:,::1], intp[::1], intp, intp)",
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "n_features": numba.types.intp,
         "result": numba.types.intp,
@@ -137,7 +137,7 @@ def _find_node_split_dim(data, idx_array, idx_start, idx_end):
 @numba.njit(
     "int8(float32[:,::1], intp, intp, intp)",
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "val1": numba.types.float32,
         "val2": numba.types.float32,
@@ -164,7 +164,7 @@ def _compare_indices(data, axis, idx1, idx2):
 @numba.njit(
     "void(float32[:,::1], intp[::1], intp, intp, intp)",
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "i": numba.types.intp,
         "key_idx": numba.types.intp,
@@ -186,7 +186,7 @@ def _insertion_sort_indices(data, idx_array, axis, left, right):
 @numba.njit(
     "void(float32[:,::1], intp[::1], intp, intp, intp, intp)",
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "root": numba.types.intp,
         "child": numba.types.intp,
@@ -229,7 +229,7 @@ def _sift_down_indices(data, idx_array, axis, offset, start, end):
 
 @numba.njit(
     "void(float32[:,::1], intp[::1], intp, intp, intp)",
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "size": numba.types.intp,
         "i": numba.types.intp,
@@ -251,7 +251,7 @@ def _heapsort_indices(data, idx_array, axis, left, right):
 @numba.njit(
     "intp(float32[:,::1], intp[::1], intp, intp, intp)",
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "mid": numba.types.intp,
         "idx_left": numba.types.intp,
@@ -284,7 +284,7 @@ def _median_of_three_pivot(data, idx_array, axis, left, right):
 @numba.njit(
     "intp(float32[:,::1], intp[::1], intp, intp, intp, intp)",
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "pivot_value": numba.types.float32,
         "pivot_original_idx": numba.types.intp,
@@ -334,7 +334,7 @@ def _partition_indices(data, idx_array, axis, left, right, pivot_idx):
 
 @numba.njit(
     "void(float32[:,::1], intp[::1], intp, intp, intp, intp, intp)",
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "pivot_idx": numba.types.intp,
         "pivot_pos": numba.types.intp,
@@ -370,7 +370,7 @@ def _introselect_impl(data, idx_array, axis, left, right, nth, depth_limit):
 
 @numba.njit(
     "void(float32[:,::1], intp[::1], intp, intp, intp, intp)",
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "size": numba.types.intp,
         "max_depth": numba.types.intp,
@@ -391,7 +391,7 @@ def _introselect(data, idx_array, axis, left, right, nth):
 
 @numba.njit(
     "void(float32[:, ::1], intp[::1], intp[::1], intp[::1], float32[::1], bool_[::1], float32[:, :, ::1], intp, intp, intp)",
-    cache=True,
+    cache=NUMBA_CACHE,
 )
 def _recursive_build_tree(
     data,
@@ -510,7 +510,6 @@ def build_kdtree(data, leaf_size=40):
         "f8(f4[::1],f8[::1])",
     ],
     fastmath=True,
-    cache=True,
     locals={
         "dim": numba.types.intp,
         "i": numba.types.uint16,
@@ -536,7 +535,6 @@ def rdist(x, y):
         "f4(f8[::1],f8[::1],f8[::1])",
     ],
     fastmath=True,
-    cache=True,
     locals={
         "dim": numba.types.intp,
         "i": numba.types.uint16,
@@ -619,9 +617,9 @@ def simple_heap_push(priorities, indices, p, n):
     return 1
 
 
-@numba.njit(cache=NUMBA_CACHE
+@numba.njit(
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     locals={
         "left_child": numba.types.intp,
         "right_child": numba.types.intp,
@@ -663,7 +661,6 @@ def deheap_sort(distances, indices):
 
 @numba.njit(
     fastmath=True,
-    cache=True,
     locals={
         "node": numba.types.intp,
         "left": numba.types.intp,
@@ -740,7 +737,7 @@ def tree_query_recursion(
 
 
 @numba.njit(
-    parallel=True, 
+    parallel=True,
     fastmath=True,
     cache=NUMBA_CACHE,
     locals={

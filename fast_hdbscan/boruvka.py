@@ -30,7 +30,7 @@ def select_components(candidate_distances, candidate_neighbors, point_components
     return component_edges
 
 
-@numba.njit(locals={"i": numba.types.int64}, cache=Truecache=NUMBA_CACHE)
+@numba.njit(locals={"i": numba.types.int64}, cache=NUMBA_CACHE)
 def merge_components(
     disjoint_set, candidate_neighbors, candidate_neighbor_distances, point_components
 ):
@@ -123,7 +123,7 @@ def update_component_vectors(tree, disjoint_set, node_components, point_componen
                 node_components[i] = node_components[left]
 
 
-@numba.njit(cache=NUMBA_CACHE
+@numba.njit(
     locals={
         "i": numba.types.int32,
         "idx": numba.types.int32,
@@ -133,7 +133,7 @@ def update_component_vectors(tree, disjoint_set, node_components, point_componen
         "dist_lower_bound_left": numba.types.float32,
         "dist_lower_bound_right": numba.types.float32,
     },
-    cache=True,
+    cache=NUMBA_CACHE,
     fastmath=True,
 )
 def component_aware_query_recursion(
@@ -316,7 +316,7 @@ def boruvka_tree_query(tree, node_components, point_components, core_distances):
     return candidate_distances, candidate_indices
 
 
-@numba.njit(inline="always", cache=True)
+@numba.njit(inline="always", cache=NUMBA_CACHE)
 def calculate_block_size(n_components, n_points, num_threads):
     """Calculate adaptive block size based on component sizes."""
     if n_components == 0:
@@ -348,7 +348,7 @@ def calculate_block_size(n_components, n_points, num_threads):
         "component": numba.types.int32,
         "block_bound": numba.types.float32,
     },
-    cache=True,
+    cache=NUMBA_CACHE,
     fastmath=True,
     inline="always",
 )
@@ -377,7 +377,7 @@ def update_component_bounds_from_block(
         "current_component": numba.types.int32,
     },
     parallel=True,
-    cache=True,
+    cache=NUMBA_CACHE,
     fastmath=True,
 )
 def boruvka_tree_query_reproducible(
@@ -517,7 +517,7 @@ def sample_weight_core_distance(distances, neighbors, sample_weights, min_sample
     return core_distances
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def parallel_boruvka(
     tree, n_threads, min_samples=10, sample_weights=None, reproducible=False
 ):
