@@ -37,7 +37,7 @@ ClusterTree = NewType("ClusterTree", Dict[Tuple[int, int], List[Tuple[int, int]]
     nogil=True,
     parallel=False,
     fastmath=True,
-    cache=True,
+    cache=NUMBA_CACHE,
 )
 def find_peaks(x):
     # Preallocate, there can't be more maxima than half the size of `x`
@@ -147,7 +147,7 @@ def _binary_search_for_n_clusters(uncondensed_tree, approx_n_clusters, n_samples
             return upper_leaves, upper_clusters, strengths
 
 
-# @numba.njit(cache=True)
+# @numba.njit(cache=NUMBA_CACHE)
 def binary_search_for_n_clusters(
     data,
     approx_n_clusters,
@@ -176,7 +176,7 @@ def binary_search_for_n_clusters(
     return clusters, strengths
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def min_cluster_size_barcode(cluster_tree, n_points, min_size):
     n_nodes = cluster_tree.child[-1] - n_points + 1
     parents = np.empty(n_nodes, dtype=np.int32)
@@ -205,7 +205,7 @@ def min_cluster_size_barcode(cluster_tree, n_points, min_size):
     return size_births, size_deaths, parents, lambda_deaths
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def compute_total_persistence(births, deaths, lambda_deaths):
     # maintain left-open (birth, death] interval!
     sizes = np.unique(births)
@@ -240,7 +240,7 @@ def compute_total_persistence(births, deaths, lambda_deaths):
     return sizes, total_persistence
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def extract_clusters_by_id(condensed_tree, selected_ids):
     labels = get_cluster_label_vector(
         condensed_tree,
@@ -254,7 +254,7 @@ def extract_clusters_by_id(condensed_tree, selected_ids):
     return labels, strengths
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def jaccard_similarity(set_a_array, set_b_array):
     # Convert to sets for intersection/union operations
     intersection_count = 0
@@ -270,7 +270,7 @@ def jaccard_similarity(set_a_array, set_b_array):
     return intersection_count / union_count if union_count > 0 else 0.0
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def estimate_cluster_similarity(births, deaths, birth_a, birth_b):
     # Find clusters active at birth_a
     clusters_a = np.empty(len(births), dtype=np.int64)
@@ -295,7 +295,7 @@ def estimate_cluster_similarity(births, deaths, birth_a, birth_b):
     return jaccard_similarity(active_a, active_b)
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=NUMBA_CACHE)
 def select_diverse_peaks(
     peaks,
     total_persistence,
