@@ -25,7 +25,14 @@ low dimensional. The primary advantages of this library over the standard ``hdbs
  * this library is much simpler and more approachable for extending or using components from;
  * this library is built on numba and has less issues with binaries and compilation.
 
-This library does not support all the features and input formats available in the hdbscan library.
+This library does not support all the features and input formats available in the hdbscan library. However, this
+library does support a number of research extensions to HDBSCAN including branch detection
+from `FLASC <https://peerj.com/articles/cs-2792/>`_ and the semi-supervised clustering methods, 
+as well as support for sample weights.
+
+As a bonus this library also provides an easy to use implementation of the
+`PLSCAN <https://arxiv.org/abs/2512.16558>`_ algorithm for automated cluster 
+resolution selection and layered clustering.
 
 -----------
 Basic Usage
@@ -47,7 +54,21 @@ Euclidean data (e.g. the output of UMAP), you can use this library as a straight
     clusterer = fast_hdbscan.HDBSCAN(min_cluster_size=10)
     cluster_labels = clusterer.fit_predict(data)
 
-The first import of the package will take a while, as numba functions will be compiled for the first time. These functions are cached by default; you can tell numba to ignore the cache by setting the environment variable ``FAST_HDBSCAN_NUMBA_CACHE`` to 'false'.
+The first import of the package will take a while, as numba functions will be compiled for the first time. 
+These functions are cached by default; you can tell numba to ignore the cache by setting the environment variable ``FAST_HDBSCAN_NUMBA_CACHE`` to 'false'.
+
+Aternatively, you can use the ``PLSCAN`` class to perform automated multiscale clustering:
+
+.. code:: python
+
+    import fast_hdbscan
+    from sklearn.datasets import make_blobs
+
+    data, _ = make_blobs(1000)
+
+    clusterer = fast_hdbscan.PLSCAN()
+    cluster_labels = clusterer.fit_predict(data)
+    print(len(clusterer.cluster_layers_)) # number of layers found -- each layer is a layering at a different resolution
 
 ------------
 Installation
@@ -95,6 +116,15 @@ The branch-detection functionality is adapted from:
     *FLASC: a flare-sensitive clustering algorithm.*
     In: PeerJ Computer Science, Volume 11, e2792, 2025.
     https://doi.org/10.7717/peerj-cs.2792.
+
+The PLSCAN functionality is adapted from:
+
+    D.M. Bot, L. McInnes, J. Aerts.
+    *Persistent Multiscale Density-based Clustering.*
+    In: arXiv preprint arXiv:2512.16558, 2025.
+    https://arxiv.org/abs/2512.16558.
+
+
 
 -------
 License

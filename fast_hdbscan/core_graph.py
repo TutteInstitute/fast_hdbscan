@@ -2,13 +2,18 @@ import numba
 import numpy as np
 from collections import namedtuple
 
-from .disjoint_set import ds_rank_create
+from .disjoint_set import ds_rank_create, ds_find, ds_union_by_rank
 from .hdbscan import clusters_from_spanning_tree
 from .cluster_trees import empty_condensed_tree
-from .boruvka import merge_components, update_point_components
 from .variables import NUMBA_CACHE
 
 CoreGraph = namedtuple("CoreGraph", ["weights", "distances", "indices", "indptr"])
+
+
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
+def update_point_components(disjoint_set, point_components):
+    for i in numba.prange(point_components.shape[0]):
+        point_components[i] = ds_find(disjoint_set, np.int32(i))
 
 
 @numba.njit(parallel=True, cache=NUMBA_CACHE)
@@ -77,7 +82,7 @@ def sort_by_lens(graph):
     for point in numba.prange(len(graph.indptr) - 1):
         start = graph.indptr[point]
         end = graph.indptr[point + 1]
-        
+
         row_weights = graph.weights[start:end]
         row_distances = graph.distances[start:end]
         row_indices = graph.indices[start:end]
@@ -122,6 +127,28 @@ def select_components(distances, indices, indptr, point_components):
             component_edges[from_component] = (parent, neighbor, distance)
 
     return component_edges
+
+
+@numba.njit(cache=NUMBA_CACHE)
+def merge_components(disjoint_set, component_edges):
+    result = np.empty((len(component_edges), 3), dtype=np.float64)
+    result_idx = 0
+
+    # Add the best edges to the edge set and merge the relevant components
+    for edge in component_edges.values():
+        from_component = ds_find(disjoint_set, edge[0])
+        to_component = ds_find(disjoint_set, edge[1])
+        if from_component != to_component:
+            result[result_idx] = (
+                np.float64(edge[0]),
+                np.float64(edge[1]),
+                np.float64(edge[2]),
+            )
+            result_idx += 1
+
+            ds_union_by_rank(disjoint_set, from_component, to_component)
+
+    return result[:result_idx]
 
 
 @numba.njit(parallel=True, cache=NUMBA_CACHE)

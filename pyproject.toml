@@ -4,19 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fast_hdbscan"
-version = "0.2.2"
+version = "0.3.0"
 authors = [{name = "Leland McInnes", email = "leland.mcinnes@gmail.com"}]
 maintainers = [{name = "Leland McInnes", email = "leland.mcinnes@gmail.com"}]
-description = "A fast multicore version of hdbscan for low dimensional euclidean spaces"
+description = "A fast multicore version of hdbscan and plscan for low dimensional euclidean spaces"
 readme = "README.rst"
-keywords = ["cluster", "clustering", "hdbscan", "dbscan"]
+keywords = ["cluster", "clustering", "hdbscan", "dbscan", "plscan"]
 license = "BSD-2-Clause"
 classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.10"
