@@ -547,6 +547,7 @@ class PLSCAN(ClusterMixin, BaseEstimator):
 
         if len(self.cluster_layers_) == 1:
             self.labels_ = self.cluster_layers_[0]
+            self.membership_strengths_ = self.membership_strength_layers_[0]
         else:
             best_layer = np.argmax(self.layer_persistence_scores_)
             self.labels_ = self.cluster_layers_[best_layer]
