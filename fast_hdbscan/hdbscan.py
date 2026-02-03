@@ -155,6 +155,104 @@ def fast_hdbscan(
     reproducible=False,
     return_trees=False,
 ):
+    """Perform HDBSCAN clustering on data.
+
+    This is the low-level functional interface for HDBSCAN clustering.
+    For a sklearn-compatible estimator interface, use the :class:`HDBSCAN` class.
+
+    Parameters
+    ----------
+    data : array-like of shape (n_samples, n_features)
+        The input data to cluster. Must contain finite values.
+
+    data_labels : array-like of shape (n_samples,), optional
+        Partial labels for semi-supervised clustering. Labels should be >= 0
+        for labeled points and -1 for unlabeled points. Only used if
+        `semi_supervised=True`.
+
+    semi_supervised : bool, default=False
+        Whether to perform semi-supervised clustering using provided labels
+        in `data_labels`.
+
+    ss_algorithm : {'bc', 'bc_simple'}, default='bc'
+        Semi-supervised algorithm to use. Only relevant when
+        `semi_supervised=True`. 'bc' allows virtual nodes, 'bc_simple' does not.
+
+    min_samples : int, default=10
+        The number of samples in a neighborhood for a point to be considered
+        as a core point. If None, defaults to `min_cluster_size`.
+
+    min_cluster_size : int, default=10
+        The minimum size for clusters to be recognized as such.
+
+    cluster_selection_method : {'eom', 'leaf'}, default='eom'
+        Method for selecting clusters from the condensed tree. 'eom' uses
+        Excess of Mass, 'leaf' selects all leaf nodes.
+
+    max_cluster_size : float, default=inf
+        Maximum size of clusters to extract. Only relevant for 'eom' method.
+
+    allow_single_cluster : bool, default=False
+        Whether to allow the entire dataset to be returned as a single cluster.
+
+    cluster_selection_epsilon : float, default=0.0
+        Epsilon value for cluster selection. Governs the minimal distance
+        between clusters selected in the hierarchy.
+
+    cluster_selection_persistence : float, default=0.0
+        Simplify the hierarchy before cluster extraction by removing nodes
+        with persistence below this value.
+
+    sample_weights : array-like of shape (n_samples,), optional
+        Weights for each sample. If specified, weighted clustering is performed.
+
+    reproducible : bool, default=False
+        Whether to use reproducible (slightly slower thread-safe) algorithms.
+        Useful for ensuring exact reproducibility across runs.
+
+    return_trees : bool, default=False
+        Whether to return the single linkage tree, condensed tree, and minimum
+        spanning tree in addition to labels and probabilities.
+
+    Returns
+    -------
+    labels : ndarray of shape (n_samples,)
+        Cluster label for each point. Noise points are labeled -1.
+
+    probabilities : ndarray of shape (n_samples,)
+        The probability that each point is a core member of its assigned cluster.
+
+    single_linkage_tree : ndarray, optional
+        Single linkage tree formed from the mutual reachability distances.
+        Only returned if `return_trees=True`.
+
+    condensed_tree : NamedTuple, optional
+        Condensed representation of the single linkage tree. Only returned if
+        `return_trees=True`.
+
+    min_spanning_tree : ndarray, optional
+        Minimum spanning tree constructed from the data. Only returned if
+        `return_trees=True`.
+
+    neighbors : ndarray of shape (n_samples, min_samples)
+        The k-nearest neighbors of each point.
+
+    core_distances : ndarray of shape (n_samples,)
+        The core distance of each point.
+
+    Notes
+    -----
+    This function is intended for advanced users. The :class:`HDBSCAN` class
+    provides a more convenient sklearn-compatible interface.
+
+    Examples
+    --------
+    >>> from fast_hdbscan import fast_hdbscan
+    >>> import numpy as np
+    >>> data = np.random.random((100, 2))
+    >>> labels, probabilities, neighbors, core_distances = fast_hdbscan(
+    ...     data, min_cluster_size=10)
+    """
     data = check_array(data)
 
     # Detect parameter inconsistencies early.
@@ -311,6 +409,122 @@ def clusters_from_spanning_tree(
 
 
 class HDBSCAN(ClusterMixin, BaseEstimator):
+    """Hierarchical Density-Based Spatial Clustering of Applications with Noise.
+
+    HDBSCAN is a clustering algorithm that uses a hierarchical approach based on
+    density, making it robust to varying cluster densities and effective at
+    identifying noise. This implementation is optimized for low-dimensional,
+    Euclidean data (2D to ~20D) and leverages multi-core parallelization for
+    improved performance.
+
+    The algorithm works by:
+    1. Computing a k-nearest neighbor graph using a KD-tree
+    2. Constructing a minimum spanning tree from mutual reachability distances
+    3. Building a single-linkage clustering hierarchy
+    4. Extracting clusters from the hierarchy using specified criteria
+
+    This implementation supports several research extensions including:
+    - Semi-supervised clustering with partial labels
+    - Sample weighting
+    - Branch detection for identifying sub-structure within clusters
+
+    Parameters
+    ----------
+    min_cluster_size : int, default=5
+        The minimum number of samples in a group for that group to be considered
+        as a cluster; groupings smaller than this size will be left as noise.
+
+    min_samples : int, optional
+        The number of samples in a neighborhood for a point to be considered as
+        a core point. If None, defaults to `min_cluster_size`.
+
+    cluster_selection_method : {'eom', 'leaf'}, default='eom'
+        Method for selecting clusters from the hierarchy:
+        - 'eom': Excess of Mass - removes points not essential to the clustering.
+        - 'leaf': Select all leaf nodes from the cluster hierarchy.
+
+    allow_single_cluster : bool, default=False
+        By default HDBSCAN will not produce a single cluster, setting all points
+        as noise. Set to True to allow a single cluster output when appropriate.
+
+    max_cluster_size : float, default=inf
+        Maximum size of clusters extracted. This only affects the 'eom' cluster
+        selection method. Clusters larger than this are split and treated as
+        sub-clusters. Useful for detecting hierarchical cluster structure.
+
+    cluster_selection_epsilon : float, default=0.0
+        Governs the minimal distance between clusters returned. Clusters closer
+        than this distance in the hierarchy are merged. Useful for controlling
+        the granularity of the clustering.
+
+    cluster_selection_persistence : float, default=0.0
+        Simplifies the hierarchy before cluster extraction by removing nodes
+        with persistence (stability) below this threshold. Helps identify more
+        stable cluster structure.
+
+    semi_supervised : bool, default=False
+        Enable semi-supervised clustering when partial labels are provided via
+        the `y` parameter during fit.
+
+    ss_algorithm : {'bc', 'bc_simple'}, default='bc'
+        Semi-supervised algorithm variant:
+        - 'bc': Allows virtual nodes for unlabeled point inference.
+        - 'bc_simple': Direct label propagation without virtual nodes.
+
+    reproducible : bool, default=False
+        Use slightly slower thread-safe algorithms to ensure reproducibility across runs.
+        Useful for debugging but may be slower.
+
+    Attributes
+    ----------
+    labels_ : ndarray of shape (n_samples,)
+        Cluster labels for each point in the fitted data. Noise points are
+        labeled -1.
+
+    probabilities_ : ndarray of shape (n_samples,)
+        Probability that each point is a core member of its assigned cluster.
+        Values range from 0 to 1.
+
+    condensed_tree_ : CondensedTree
+        The condensed cluster hierarchy from which clusters were extracted.
+        Provides visualization and analysis of the clustering structure.
+        See :class:`~hdbscan.plots.CondensedTree`.
+
+    single_linkage_tree_ : SingleLinkageTree
+        The single linkage tree formed by the mutual reachability distances.
+        See :class:`~hdbscan.plots.SingleLinkageTree`.
+
+    minimum_spanning_tree_ : MinimumSpanningTree
+        The minimum spanning tree of the input data. Only available if raw
+        data was provided during fit.
+        See :class:`~hdbscan.plots.MinimumSpanningTree`.
+
+    Examples
+    --------
+    >>> from fast_hdbscan import HDBSCAN
+    >>> import numpy as np
+    >>> X = np.random.random((100, 2))
+    >>> clusterer = HDBSCAN(min_cluster_size=5)
+    >>> cluster_labels = clusterer.fit_predict(X)
+
+    With semi-supervised clustering:
+
+    >>> y_partial = np.full(100, -1)
+    >>> y_partial[:10] = 0  # Label first 10 points as cluster 0
+    >>> clusterer = HDBSCAN(semi_supervised=True)
+    >>> cluster_labels = clusterer.fit_predict(X, y=y_partial)
+
+    References
+    ----------
+    .. [1] Campello, R. J. G. B., Moulavi, D., & Sander, J. (2013).
+           Density-based clustering based on hierarchical density estimates.
+           In PAKDD (pp. 160-172).
+
+    .. [2] McInnes, L., Healy, J., & Astels, S. (2017).
+           hdbscan: Hierarchical density based clustering.
+           The Journal of Open Source Software, 2(11), 205.
+    """
+
     def __init__(
         self,
         *,
@@ -479,6 +693,95 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
 
 
 class PLSCAN(ClusterMixin, BaseEstimator):
+    """Persistence-based Layered Clustering for Automated Cluster Multiscaling.
+
+    PLSCAN is a clustering algorithm that automatically determines the optimal
+    clustering resolution by constructing a hierarchy of clusterings at different
+    scales. It identifies the most persistent (stable) clustering layer across
+    scales, providing principled automatic cluster count selection.
+
+    The algorithm:
+    1. Effectively iteratively applies HDBSCAN at increasing min_cluster_size values
+    2. Computes persistence scores for each layer based on cluster stability
+    3. Returns the clustering layer with the best persistence/stability
+
+    It achieves this by building all possible HDBSCAN clusterings with progressively
+    larger `min_cluster_size` values, without having to re-cluster the data,
+    but instead extracts the relevant clusterings from a single hierarchical structure.
+
+    This approach is particularly valuable when the optimal number of clusters
+    is unknown and needs to be automatically determined from the data.
+
+    Parameters
+    ----------
+    min_samples : int, default=5
+        The number of samples in a neighborhood for a point to be considered
+        as a core point in each effective HDBSCAN iteration.
+
+    max_layers : int, default=10
+        Maximum number of clustering layers to construct.
+        Each layer uses a progressively larger `min_cluster_size`.
+
+    base_min_cluster_size : int, default=10
+        Initial `min_cluster_size` for the first HDBSCAN iteration. Each
+        subsequent layer increases this value.
+
+    base_n_clusters : int, optional
+        Expected baseline number of clusters. If specified, used to guide
+        the search for optimal clustering. If None, determined adaptively.
+
+    layer_similarity_threshold : float, default=0.2
+        Threshold for determining when clustering layers are sufficiently
+        different. Used to identify redundant or similar layers.
+
+    reproducible : bool, default=False
+        Use slightly slower thread-safe algorithms to ensure reproducibility across runs.
+        Useful for debugging but may be slower.
+
+    verbose : bool, default=False
+        Enable verbose output during layer construction.
+
+    Attributes
+    ----------
+    labels_ : ndarray of shape (n_samples,)
+        Cluster labels from the best (most persistent) layer. Noise points
+        are labeled -1.
+
+    membership_strengths_ : ndarray of shape (n_samples,)
+        Probability that each point is a core member of its assigned cluster.
+
+    cluster_layers_ : list of ndarray
+        List of cluster label arrays, one for each constructed layer.
+        Each element is an array of shape (n_samples,).
+
+    membership_strength_layers_ : list of ndarray
+        List of membership strength arrays, one for each layer.
+
+    layer_persistence_scores_ : ndarray of shape (n_layers,)
+        Persistence (stability) score for each layer. Higher values indicate
+        more stable, reliable clusterings.
+
+    min_cluster_sizes_ : ndarray of shape (n_layers,)
+        The `min_cluster_size` value used for each HDBSCAN layer.
+
+    total_persistence_ : float
+        Overall persistence score across all layers.
+
+    cluster_tree_ : dict
+        Hierarchical relationship between clusters across layers.
+
+    Examples
+    --------
+    >>> from fast_hdbscan import PLSCAN
+    >>> import numpy as np
+    >>> X = np.random.random((200, 2))
+    >>> clusterer = PLSCAN(max_layers=5)
+    >>> cluster_labels = clusterer.fit_predict(X)
+    >>> n_layers = len(clusterer.cluster_layers_)
+    >>> print(f"Found {n_layers} clustering layers")
+    >>> best_layer_idx = np.argmax(clusterer.layer_persistence_scores_)
+    >>> print(f"Best layer: {best_layer_idx}")
+    """
 
     def __init__(
         self,
