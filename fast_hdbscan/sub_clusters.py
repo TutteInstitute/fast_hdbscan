@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Converts data point lens values into edge distances and looks for clusters
 induced by those distances within the clusters found by HDBSCAN.
@@ -5,8 +7,13 @@ induced by those distances within the clusters found by HDBSCAN.
 
 import numba
 import numpy as np
+from typing import Optional, Union, Literal, Callable, Tuple, TYPE_CHECKING, Any
+import numpy.typing as npt
 from sklearn.utils.validation import check_is_fitted, _check_sample_weight
 from sklearn.base import BaseEstimator, ClusterMixin
+
+if TYPE_CHECKING:
+    from .hdbscan import HDBSCAN
 
 from .hdbscan import to_numpy_rec_array
 from .core_graph import core_graph_clusters, core_graph_to_edge_list
@@ -450,15 +457,17 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
     def __init__(
         self,
         *,
-        lens_values=None,
-        min_cluster_size=None,
-        max_cluster_size=None,
-        allow_single_cluster=False,
-        cluster_selection_method="eom",
-        cluster_selection_epsilon=0.0,
-        cluster_selection_persistence=0.0,
-        propagate_labels=False,
-    ):
+        lens_values: Optional[
+            Union[npt.NDArray[np.float_], Callable[..., npt.NDArray[np.float_]]]
+        ] = None,
+        min_cluster_size: Optional[int] = None,
+        max_cluster_size: Optional[float] = None,
+        allow_single_cluster: bool = False,
+        cluster_selection_method: Literal["eom", "leaf"] = "eom",
+        cluster_selection_epsilon: float = 0.0,
+        cluster_selection_persistence: float = 0.0,
+        propagate_labels: bool = False,
+    ) -> None:
         self.lens_values = lens_values
         self.min_cluster_size = min_cluster_size
         self.max_cluster_size = max_cluster_size
@@ -470,12 +479,12 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
 
     def fit(
         self,
-        clusterer,
-        labels=None,
-        probabilities=None,
-        sample_weight=None,
-        lens_callback=None,
-    ):
+        clusterer: "HDBSCAN",
+        labels: Optional[npt.NDArray[np.int_]] = None,
+        probabilities: Optional[npt.NDArray[np.float_]] = None,
+        sample_weight: Optional[npt.ArrayLike] = None,
+        lens_callback: Optional[Callable[..., npt.NDArray[np.float_]]] = None,
+    ) -> "SubClusterDetector":
         """labels and probabilities override the clusterer's values."""
         # get_params breaks with inherited classes!
         (
@@ -510,7 +519,7 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
         self._core_distances = clusterer._core_distances
         return self
 
-    def propagated_labels(self):
+    def propagated_labels(self) -> Tuple[npt.NDArray[np.int_], npt.NDArray[np.int_]]:
         """Propagate sub-cluster labels to noise points."""
         check_is_fitted(
             self,

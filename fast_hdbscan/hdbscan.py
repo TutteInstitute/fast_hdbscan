@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import numba
 
@@ -11,7 +13,8 @@ from sklearn.utils.validation import (
 from sklearn.neighbors import KDTree
 
 from warnings import warn
-from typing import Optional
+from typing import Optional, Union, Literal, Any
+import numpy.typing as npt
 
 from .numba_kdtree import kdtree_to_numba, build_kdtree
 from .boruvka import parallel_boruvka
@@ -528,18 +531,18 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
     def __init__(
         self,
         *,
-        min_cluster_size=5,
-        min_samples=None,
-        cluster_selection_method="eom",
-        allow_single_cluster=False,
-        max_cluster_size=np.inf,
-        cluster_selection_epsilon=0.0,
-        cluster_selection_persistence=0.0,
-        semi_supervised=False,
-        ss_algorithm="bc",
-        reproducible=False,
+        min_cluster_size: int = 5,
+        min_samples: Optional[int] = None,
+        cluster_selection_method: Literal["eom", "leaf"] = "eom",
+        allow_single_cluster: bool = False,
+        max_cluster_size: float = np.inf,
+        cluster_selection_epsilon: float = 0.0,
+        cluster_selection_persistence: float = 0.0,
+        semi_supervised: bool = False,
+        ss_algorithm: Literal["bc", "bc_simple"] = "bc",
+        reproducible: bool = False,
         # Removed **kwargs to comply with scikit-learn's API requirements
-    ):
+    ) -> None:
         self.min_cluster_size = min_cluster_size
         self.min_samples = min_samples
         self.cluster_selection_method = cluster_selection_method
@@ -551,7 +554,13 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.ss_algorithm = ss_algorithm
         self.reproducible = reproducible
 
-    def fit(self, X, y=None, sample_weight=None, **fit_params):
+    def fit(
+        self,
+        X: npt.ArrayLike,
+        y: Optional[npt.ArrayLike] = None,
+        sample_weight: Optional[npt.ArrayLike] = None,
+        **fit_params: Any,
+    ) -> "HDBSCAN":
 
         if self.semi_supervised:
             X, y = check_X_y(X, y, accept_sparse="csr", ensure_all_finite=False)
@@ -626,7 +635,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
 
         return self
 
-    def dbscan_clustering(self, epsilon):
+    def dbscan_clustering(self, epsilon: float) -> npt.NDArray[np.int_]:
         check_is_fitted(
             self,
             "_single_linkage_tree",
@@ -792,8 +801,8 @@ class PLSCAN(ClusterMixin, BaseEstimator):
         base_n_clusters: Optional[int] = None,
         layer_similarity_threshold: float = 0.2,
         reproducible: bool = False,
-        verbose=False,
-    ):
+        verbose: bool = False,
+    ) -> None:
         self.min_samples = min_samples
         self.max_layers = max_layers
         self.base_min_cluster_size = base_min_cluster_size
@@ -804,7 +813,7 @@ class PLSCAN(ClusterMixin, BaseEstimator):
 
         self._validate_params()
 
-    def _validate_params(self):
+    def _validate_params(self) -> None:
         if (
             not np.issubdtype(type(self.min_samples), np.integer)
         ) or self.min_samples <= 0:
@@ -826,7 +835,13 @@ class PLSCAN(ClusterMixin, BaseEstimator):
             ) or self.base_n_clusters <= 0:
                 raise ValueError("Base n clusters must be a positive integer!")
 
-    def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
+    def fit_predict(
+        self,
+        X: npt.ArrayLike,
+        y: Optional[npt.ArrayLike] = None,
+        sample_weight: Optional[npt.ArrayLike] = None,
+        **fit_params: Any,
+    ) -> npt.NDArray[np.int_]:
         X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
         self._raw_data = X
 
@@ -858,6 +873,12 @@ class PLSCAN(ClusterMixin, BaseEstimator):
 
         return self.labels_
 
-    def fit(self, X, y=None, sample_weight=None, **fit_params):
+    def fit(
+        self,
+        X: npt.ArrayLike,
+        y: Optional[npt.ArrayLike] = None,
+        sample_weight: Optional[npt.ArrayLike] = None,
+        **fit_params: Any,
+    ) -> "PLSCAN":
         _ = self.fit_predict(X, y=y, sample_weight=sample_weight, **fit_params)
         return self

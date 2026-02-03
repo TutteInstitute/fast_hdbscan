@@ -1,8 +1,20 @@
+from __future__ import annotations
+
 import numpy as np
+from typing import Optional, Literal, Tuple, TYPE_CHECKING, Any, List
+import numpy.typing as npt
+
 from .sub_clusters import SubClusterDetector, find_sub_clusters
 
+if TYPE_CHECKING:
+    from .hdbscan import HDBSCAN
 
-def compute_centrality(data, probabilities, *args):
+
+def compute_centrality(
+    data: npt.NDArray[np.float_],
+    probabilities: npt.NDArray[np.float_],
+    *args: Any,
+) -> npt.NDArray[np.float_]:
     points = args[-1]
     cluster_data = data[points, :]
     centroid = np.average(cluster_data, weights=probabilities[points], axis=0)
@@ -11,14 +23,14 @@ def compute_centrality(data, probabilities, *args):
 
 
 def apply_branch_threshold(
-    labels,
-    branch_labels,
-    probabilities,
-    cluster_probabilities,
-    cluster_points,
-    linkage_trees,
-    label_sides_as_branches=False,
-):
+    labels: npt.NDArray[np.int_],
+    branch_labels: npt.NDArray[np.int_],
+    probabilities: npt.NDArray[np.float_],
+    cluster_probabilities: npt.NDArray[np.float_],
+    cluster_points: List[npt.NDArray[np.int_]],
+    linkage_trees: List[Optional[npt.NDArray[np.float_]]],
+    label_sides_as_branches: bool = False,
+) -> None:
     running_id = 0
     min_branch_count = 1 if label_sides_as_branches else 2
     for pts, tree in zip(cluster_points, linkage_trees):
@@ -35,17 +47,24 @@ def apply_branch_threshold(
 
 
 def find_branch_sub_clusters(
-    clusterer,
-    cluster_labels=None,
-    cluster_probabilities=None,
-    label_sides_as_branches=False,
-    min_cluster_size=None,
-    max_cluster_size=None,
-    allow_single_cluster=None,
-    cluster_selection_method=None,
-    cluster_selection_epsilon=0.0,
-    cluster_selection_persistence=0.0,
-):
+    clusterer: "HDBSCAN",
+    cluster_labels: Optional[npt.NDArray[np.int_]] = None,
+    cluster_probabilities: Optional[npt.NDArray[np.float_]] = None,
+    label_sides_as_branches: bool = False,
+    min_cluster_size: Optional[int] = None,
+    max_cluster_size: Optional[float] = None,
+    allow_single_cluster: Optional[bool] = None,
+    cluster_selection_method: Optional[Literal["eom", "leaf"]] = None,
+    cluster_selection_epsilon: float = 0.0,
+    cluster_selection_persistence: float = 0.0,
+) -> Tuple[
+    npt.NDArray[np.int_],
+    npt.NDArray[np.float_],
+    npt.NDArray[np.int_],
+    npt.NDArray[np.float_],
+    npt.NDArray[np.int_],
+    npt.NDArray[np.float_],
+]:
     """Detect branch sub-clusters within clusters using flare detection.
 
     This function identifies branches (elongated sub-structures) within clusters
@@ -148,7 +167,8 @@ def find_branch_sub_clusters(
         result[4],
         result[1],
         result[3],
-        result[-1],
+        result[11],
+        result[8],
         label_sides_as_branches=label_sides_as_branches,
     )
     return result
@@ -263,15 +283,15 @@ class BranchDetector(SubClusterDetector):
 
     def __init__(
         self,
-        min_cluster_size=None,
-        max_cluster_size=None,
-        allow_single_cluster=None,
-        cluster_selection_method=None,
-        cluster_selection_epsilon=0.0,
-        cluster_selection_persistence=0.0,
-        propagate_labels=False,
-        label_sides_as_branches=False,
-    ):
+        min_cluster_size: Optional[int] = None,
+        max_cluster_size: Optional[float] = None,
+        allow_single_cluster: Optional[bool] = None,
+        cluster_selection_method: Optional[Literal["eom", "leaf"]] = None,
+        cluster_selection_epsilon: float = 0.0,
+        cluster_selection_persistence: float = 0.0,
+        propagate_labels: bool = False,
+        label_sides_as_branches: bool = False,
+    ) -> None:
         super().__init__(
             min_cluster_size=min_cluster_size,
             max_cluster_size=max_cluster_size,
@@ -283,7 +303,13 @@ class BranchDetector(SubClusterDetector):
         )
         self.label_sides_as_branches = label_sides_as_branches
 
-    def fit(self, clusterer, labels=None, probabilities=None, sample_weight=None):
+    def fit(
+        self,
+        clusterer: "HDBSCAN",
+        labels: Optional[npt.NDArray[np.int_]] = None,
+        probabilities: Optional[npt.NDArray[np.float_]] = None,
+        sample_weight: Optional[npt.ArrayLike] = None,
+    ) -> "BranchDetector":
         super().fit(clusterer, labels, probabilities, sample_weight, compute_centrality)
         apply_branch_threshold(
             self.labels_,
@@ -299,7 +325,9 @@ class BranchDetector(SubClusterDetector):
         self.centralities_ = self.lens_values_
         return self
 
-    def propagated_labels(self, label_sides_as_branches=None):
+    def propagated_labels(
+        self, label_sides_as_branches: Optional[bool] = None
+    ) -> Tuple[npt.NDArray[np.int_], npt.NDArray[np.int_]]:
         if label_sides_as_branches is None:
             label_sides_as_branches = self.label_sides_as_branches
 
