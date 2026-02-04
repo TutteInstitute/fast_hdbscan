@@ -563,6 +563,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
     ) -> "HDBSCAN":
 
         if self.semi_supervised:
+            assert y is not None, "y cannot be None when semi_supervised is True!"
             X, y = check_X_y(X, y, accept_sparse="csr", ensure_all_finite=False)
             self._raw_labels = y
             # Replace non-finite labels with -1 labels
