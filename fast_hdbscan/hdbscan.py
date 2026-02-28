@@ -154,8 +154,20 @@ def fast_hdbscan(
     sample_weights=None,
     reproducible=False,
     return_trees=False,
+    metric="euclidean",
 ):
-    data = check_array(data)
+    if metric == "precomputed":
+        if sample_weights is not None:
+            raise NotImplementedError(
+                "sample_weights is not supported with metric='precomputed'."
+            )
+        # Validation is deferred to compute_minimum_spanning_tree -> precomputed module
+    elif metric == "euclidean":
+        data = check_array(data)
+    else:
+        raise ValueError(
+            "metric must be 'euclidean' or 'precomputed'. Got: %s" % metric
+        )
 
     # Detect parameter inconsistencies early.
     if semi_supervised:
@@ -194,6 +206,7 @@ def fast_hdbscan(
         min_samples=min_cluster_size if min_samples is None else min_samples,
         sample_weights=sample_weights,
         reproducible=reproducible,
+        metric=metric,
     )
 
     return (
@@ -216,8 +229,32 @@ def fast_hdbscan(
 
 
 def compute_minimum_spanning_tree(
-    data, min_samples=10, sample_weights=None, reproducible=False
+    data, min_samples=10, sample_weights=None, reproducible=False, metric="euclidean"
 ):
+    """
+    Compute the minimum spanning tree for HDBSCAN.
+
+    Parameters
+    ----------
+    data : array-like or scipy sparse matrix
+        Feature matrix (metric='euclidean') or pairwise weight graph
+        (metric='precomputed').
+    min_samples : int
+    sample_weights : array-like or None
+        Not supported when metric='precomputed'.
+    reproducible : bool
+    metric : str
+        'euclidean' (default) or 'precomputed'.
+    """
+    if metric == "precomputed":
+        if sample_weights is not None:
+            raise NotImplementedError(
+                "sample_weights is not supported with metric='precomputed'."
+            )
+        from .precomputed import compute_mst_from_precomputed_sparse
+
+        return compute_mst_from_precomputed_sparse(data, min_samples)
+
     n_threads = numba.get_num_threads()
     numba_tree = build_kdtree(data)
     edges, neighbors, core_distances = parallel_boruvka(
@@ -324,6 +361,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         semi_supervised=False,
         ss_algorithm="bc",
         reproducible=False,
+        metric="euclidean",
         # Removed **kwargs to comply with scikit-learn's API requirements
     ):
         self.min_cluster_size = min_cluster_size
@@ -336,10 +374,24 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
         self.reproducible = reproducible
+        self.metric = metric
 
     def fit(self, X, y=None, sample_weight=None, **fit_params):
 
-        if self.semi_supervised:
+        if self.metric == "precomputed":
+            # Precomputed sparse graph path: skip dense feature-matrix validations.
+            from .precomputed import validate_precomputed_sparse_graph
+
+            validate_precomputed_sparse_graph(X)
+            if sample_weight is not None:
+                raise NotImplementedError(
+                    "sample_weights is not supported with metric='precomputed'."
+                )
+            self._raw_data = None
+            clean_data = X
+            clean_data_labels = None
+            self._all_finite = True  # no per-row finite filtering needed
+        elif self.semi_supervised:
             X, y = check_X_y(X, y, accept_sparse="csr", ensure_all_finite=False)
             self._raw_labels = y
             # Replace non-finite labels with -1 labels
@@ -349,30 +401,47 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
                 raise ValueError(
                     "y must contain at least one label > -1. Currently it only contains -1 and/or non-finite labels!"
                 )
+            if sample_weight is not None:
+                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
+
+            self._all_finite = np.all(np.isfinite(X))
+            if ~self._all_finite:
+                finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
+                clean_data = X[finite_index]
+                clean_data_labels = y[finite_index]
+                sample_weight = (
+                    sample_weight[finite_index] if sample_weight is not None else None
+                )
+                internal_to_raw = {
+                    x: y for x, y in zip(range(len(finite_index)), finite_index)
+                }
+                outliers = list(set(range(X.shape[0])) - set(finite_index))
+            else:
+                clean_data = X
+                clean_data_labels = y
         else:
             X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
             self._raw_data = X
-        if sample_weight is not None:
-            sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
+            if sample_weight is not None:
+                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
 
-        self._all_finite = np.all(np.isfinite(X))
-        if ~self._all_finite:
-            # Pass only the purely finite indices into hdbscan
-            # We will later assign all non-finite points to the background -1 cluster
-            finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
-            clean_data = X[finite_index]
-            clean_data_labels = y[finite_index] if self.semi_supervised else None
-            sample_weight = (
-                sample_weight[finite_index] if sample_weight is not None else None
-            )
-
-            internal_to_raw = {
-                x: y for x, y in zip(range(len(finite_index)), finite_index)
-            }
-            outliers = list(set(range(X.shape[0])) - set(finite_index))
-        else:
-            clean_data = X
-            clean_data_labels = y
+            self._all_finite = np.all(np.isfinite(X))
+            if ~self._all_finite:
+                # Pass only the purely finite indices into hdbscan
+                # We will later assign all non-finite points to the background -1 cluster
+                finite_index = np.where(np.isfinite(X).sum(axis=1) == X.shape[1])[0]
+                clean_data = X[finite_index]
+                clean_data_labels = None
+                sample_weight = (
+                    sample_weight[finite_index] if sample_weight is not None else None
+                )
+                internal_to_raw = {
+                    x: y for x, y in zip(range(len(finite_index)), finite_index)
+                }
+                outliers = list(set(range(X.shape[0])) - set(finite_index))
+            else:
+                clean_data = X
+                clean_data_labels = y
 
         kwargs = self.get_params()
 
@@ -524,6 +593,14 @@ class PLSCAN(ClusterMixin, BaseEstimator):
                 raise ValueError("Base n clusters must be a positive integer!")
 
     def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
+        import scipy.sparse
+
+        if scipy.sparse.issparse(X):
+            raise ValueError(
+                "PLSCAN requires a dense feature matrix. "
+                "Sparse matrices and precomputed distance graphs are not supported. "
+                "Use HDBSCAN(metric='precomputed') for sparse precomputed graphs."
+            )
         X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
         self._raw_data = X
 
