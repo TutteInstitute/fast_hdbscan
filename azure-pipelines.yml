@@ -105,11 +105,6 @@ stages:
           condition: eq(variables['Agent.OS'], 'Darwin')
 
         - script: |
-            # llvmlite source builds can fail with newer setuptools on macOS.
-            # Pin setuptools only on macOS CI runners to avoid impacting users.
-            if [[ "$(Agent.OS)" == "Darwin" ]]; then
-              python -m pip install "setuptools<70"
-            fi
             pip install -r requirements.txt
           env:
             # Ensure that the LLVM_CONFIG environment variable is available during installation
@@ -119,10 +114,6 @@ stages:
           condition: ${{ eq(parameters.includeReleaseCandidates, false) }}
 
         - script: |
-            # llvmlite source builds can fail with newer setuptools on macOS.
-            if [[ "$(Agent.OS)" == "Darwin" ]]; then
-              python -m pip install "setuptools<70"
-            fi
             pip install --pre -r requirements.txt
           displayName: 'Install dependencies (allow pre-releases)'
           condition: ${{ eq(parameters.includeReleaseCandidates, true) }}
