@@ -389,7 +389,39 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
                 )
             self._raw_data = None
             clean_data = X
-            clean_data_labels = None
+
+            if self.semi_supervised:
+                # In precomputed mode, labels still correspond 1:1 with graph rows.
+                # Mirror the euclidean semi-supervised behavior by validating labels
+                # with scikit-learn utilities and requiring at least one supervised
+                # point.
+                if y is None:
+                    raise ValueError(
+                        "y must not be None when semi_supervised is set to True!"
+                    )
+
+                clean_data_labels = check_array(
+                    y,
+                    ensure_2d=False,
+                ).copy()
+
+                if clean_data_labels.ndim != 1:
+                    clean_data_labels = np.ravel(clean_data_labels)
+                if clean_data_labels.shape[0] != X.shape[0]:
+                    raise ValueError(
+                        "y must contain exactly one label per node when "
+                        "metric='precomputed'. "
+                        f"Got {clean_data_labels.shape[0]} labels for {X.shape[0]} nodes."
+                    )
+
+                self._raw_labels = clean_data_labels.copy()
+                if ~np.any(clean_data_labels != -1):
+                    raise ValueError(
+                        "y must contain at least one label > -1. Currently it only "
+                        "contains -1 labels!"
+                    )
+            else:
+                clean_data_labels = None
             self._all_finite = True  # no per-row finite filtering needed
         elif self.semi_supervised:
             X, y = check_X_y(X, y, accept_sparse="csr", ensure_all_finite=False)

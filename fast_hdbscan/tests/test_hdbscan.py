@@ -357,6 +357,62 @@ def test_precomputed_reject_sample_weight():
         fast_hdbscan(G, metric="precomputed", sample_weights=np.ones(8))
 
 
+def test_precomputed_semi_supervised_requires_labels():
+    """Precomputed + semi-supervised must raise a clear error when y is missing."""
+    G = _make_simple_sparse_graph(n=8)
+    with pytest.raises(ValueError, match="must not be None"):
+        HDBSCAN(metric="precomputed", semi_supervised=True).fit(G)
+
+
+def test_precomputed_semi_supervised_label_length_validation():
+    """Precomputed + semi-supervised must validate label count against node count."""
+    G = _make_simple_sparse_graph(n=8)
+    with pytest.raises(ValueError, match="one label per node"):
+        HDBSCAN(metric="precomputed", semi_supervised=True).fit(G, np.array([0, 1, 2]))
+
+
+def test_precomputed_semi_supervised_matches_euclidean_behavior():
+    """
+    Semi-supervised clustering should behave the same for euclidean and precomputed paths.
+
+    We use a full pairwise graph built from X and verify exact label parity after
+    canonical label alignment, matching the repository's metric parity strategy.
+    """
+    X_local, _ = make_blobs(
+        n_samples=40,
+        centers=[[-2.0, -2.0], [0.0, 0.0], [2.0, 2.0]],
+        cluster_std=0.2,
+        random_state=11,
+    )
+    X_local = StandardScaler().fit_transform(X_local)
+    G = _make_full_pairwise_sparse(X_local)
+
+    # Labels include supervised examples and unlabeled points (-1).
+    y_local = np.full(X_local.shape[0], -1, dtype=np.int64)
+    y_local[0] = 0
+    y_local[10] = 1
+    y_local[20] = 2
+
+    # Use bc_simple in this parity test to avoid numba instability in the
+    # optional virtual-node path on some platforms while still exercising
+    # semi-supervised parity between euclidean and precomputed metrics.
+    eu = HDBSCAN(
+        min_cluster_size=5,
+        semi_supervised=True,
+        ss_algorithm="bc_simple",
+    ).fit(X_local, y_local)
+    pre = HDBSCAN(
+        min_cluster_size=5,
+        semi_supervised=True,
+        ss_algorithm="bc_simple",
+        metric="precomputed",
+    ).fit(G, y_local)
+
+    aligned = _align_labels(eu.labels_, pre.labels_)
+    assert np.array_equal(eu.labels_, aligned)
+    assert np.allclose(eu.probabilities_, pre.probabilities_)
+
+
 def test_precomputed_validation_non_square():
     """Non-square matrix must raise ValueError."""
     G = sparse.csr_matrix(np.ones((4, 5)))
