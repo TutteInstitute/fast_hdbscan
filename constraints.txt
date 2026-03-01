@@ -1,0 +1,6 @@
+# CI dependency constraints.
+#
+# llvmlite source builds currently fail with newer setuptools on macOS runners
+# due to distutils API incompatibilities (spawn(..., dry_run=...)). Constraining
+# setuptools keeps llvmlite builds working when wheels are unavailable.
+setuptools<70
