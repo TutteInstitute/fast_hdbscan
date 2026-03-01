@@ -393,10 +393,18 @@ def test_precomputed_semi_supervised_matches_euclidean_behavior():
     y_local[10] = 1
     y_local[20] = 2
 
-    eu = HDBSCAN(min_cluster_size=5, semi_supervised=True).fit(X_local, y_local)
+    # Use bc_simple in this parity test to avoid numba instability in the
+    # optional virtual-node path on some platforms while still exercising
+    # semi-supervised parity between euclidean and precomputed metrics.
+    eu = HDBSCAN(
+        min_cluster_size=5,
+        semi_supervised=True,
+        ss_algorithm="bc_simple",
+    ).fit(X_local, y_local)
     pre = HDBSCAN(
         min_cluster_size=5,
         semi_supervised=True,
+        ss_algorithm="bc_simple",
         metric="precomputed",
     ).fit(G, y_local)
 

@@ -1,6 +1,3 @@
-# Temporary workaround for llvmlite source-build incompatibility with newer
-# setuptools on some macOS CI runners; remove once upstream is fixed.
-setuptools<70
 numpy>=1.21
 numba>=0.56
 scikit-learn>=1.6

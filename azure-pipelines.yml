@@ -105,7 +105,7 @@ stages:
           condition: eq(variables['Agent.OS'], 'Darwin')
 
         - script: |
-            pip install -r requirements.txt
+            pip install -c constraints.txt -r requirements.txt
           env:
             # Ensure that the LLVM_CONFIG environment variable is available during installation
             LLVM_CONFIG: $(LLVM_CONFIG)
@@ -114,7 +114,7 @@ stages:
           condition: ${{ eq(parameters.includeReleaseCandidates, false) }}
 
         - script: |
-            pip install --pre -r requirements.txt
+            pip install --pre -c constraints.txt -r requirements.txt
           displayName: 'Install dependencies (allow pre-releases)'
           condition: ${{ eq(parameters.includeReleaseCandidates, true) }}
 
@@ -151,7 +151,7 @@ stages:
         - script: |
             python -m pip install --upgrade pip
             pip install wheel
-            pip install -r requirements.txt
+            pip install -c constraints.txt -r requirements.txt
           displayName: 'Install dependencies'
 
         - script: |

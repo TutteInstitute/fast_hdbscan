@@ -1,0 +1,7 @@
+# Temporary CI build constraint.
+#
+# llvmlite source builds currently fail with newer setuptools in isolated PEP517
+# build environments (TypeError: spawn() got an unexpected keyword argument
+# 'dry_run'). Keep this file CI-scoped so runtime/package deps stay unchanged.
+# Remove when llvmlite/setuptools compatibility is restored upstream.
+setuptools<70
