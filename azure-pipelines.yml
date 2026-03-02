@@ -105,16 +105,21 @@ stages:
           condition: eq(variables['Agent.OS'], 'Darwin')
 
         - script: |
-            pip install -r requirements.txt
+            pip install --build-constraint constraints.txt -c constraints.txt -r requirements.txt
           env:
             # Ensure that the LLVM_CONFIG environment variable is available during installation
             LLVM_CONFIG: $(LLVM_CONFIG)
             CMAKE_PREFIX_PATH: $(CMAKE_PREFIX_PATH)
+            # Keep build isolation constrained as well; this targets PEP517
+            # build dependencies (for example llvmlite's setuptools usage).
+            PIP_BUILD_CONSTRAINT: $(System.DefaultWorkingDirectory)/constraints.txt
           displayName: 'Install dependencies'
           condition: ${{ eq(parameters.includeReleaseCandidates, false) }}
 
         - script: |
-            pip install --pre -r requirements.txt
+            pip install --pre --build-constraint constraints.txt -c constraints.txt -r requirements.txt
+          env:
+            PIP_BUILD_CONSTRAINT: $(System.DefaultWorkingDirectory)/constraints.txt
           displayName: 'Install dependencies (allow pre-releases)'
           condition: ${{ eq(parameters.includeReleaseCandidates, true) }}
 
@@ -151,7 +156,9 @@ stages:
         - script: |
             python -m pip install --upgrade pip
             pip install wheel
-            pip install -r requirements.txt
+            pip install --build-constraint constraints.txt -c constraints.txt -r requirements.txt
+          env:
+            PIP_BUILD_CONSTRAINT: $(System.DefaultWorkingDirectory)/constraints.txt
           displayName: 'Install dependencies'
 
         - script: |
@@ -186,4 +193,3 @@ stages:
             twine upload --repository pypi --config-file $(PYPIRC_CONFIG.secureFilePath) dist/* 
           displayName: 'Upload to PyPI'
           condition: and(succeeded(), eq(variables['Build.SourceBranchName'], variables['packageVersionFormatted']))
-
