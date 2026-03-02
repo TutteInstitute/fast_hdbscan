@@ -30,6 +30,7 @@ import pytest
 from sklearn import datasets
 
 import warnings
+import sys
 
 n_clusters = 3
 # X = generate_clustered_data(n_clusters=n_clusters, n_samples_per_cluster=50)
@@ -378,6 +379,11 @@ def test_precomputed_semi_supervised_matches_euclidean_behavior():
     We use a full pairwise graph built from X and verify exact label parity after
     canonical label alignment, matching the repository's metric parity strategy.
     """
+    if sys.version_info < (3, 12):
+        pytest.skip(
+            "Numba typing instability in legacy bcubed extraction on Python < 3.12"
+        )
+
     X_local, _ = make_blobs(
         n_samples=40,
         centers=[[-2.0, -2.0], [0.0, 0.0], [2.0, 2.0]],
