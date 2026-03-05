@@ -23,7 +23,7 @@ import numpy as np
 import scipy.sparse
 import numba
 
-from .core_graph import CoreGraph, minimum_spanning_tree
+from .core_graph import CoreGraph, boruvka_mst
 from .variables import NUMBA_CACHE
 
 
@@ -411,7 +411,7 @@ def compute_mst_from_precomputed_sparse(X, min_samples):
     core_graph = CoreGraph(weights, distances, cg_indices, X_sym.indptr)
 
     # 4. Borůvka MST (float32 internally — fast).
-    n_components, component_labels, mst_edges = minimum_spanning_tree(core_graph)
+    n_components, component_labels, mst_edges = boruvka_mst(core_graph)
 
     # 5. Bridge disconnected components with +inf edges.
     if n_components > 1:
@@ -422,5 +422,60 @@ def compute_mst_from_precomputed_sparse(X, min_samples):
         mst_edges, X_sym.data, X_sym.indices, X_sym.indptr, core_distances
     )
     mst_edges = np.column_stack([mst_edges[:, :2], mst_weights])
+
+    return mst_edges, neighbors, core_distances
+
+
+def compute_mst_from_precomputed_sparse_kruskal(X, min_samples):
+    """
+    Compute the MST from a scipy sparse precomputed pairwise weight matrix
+    using Kruskal's algorithm.
+
+    Compared to the Borůvka path, this function is simpler because Kruskal
+    operates directly on float64 MRD weights — no float32 CoreGraph
+    intermediate and no post-hoc weight-patching step are required.
+
+    Pipeline:
+    1. Validate input.
+    2. Symmetrize by min weight, drop diagonal (vectorized numpy).
+    3. Compute core distances in parallel (Numba JIT).
+    4. Compute float64 MRD for every stored edge (Numba JIT).
+    5. Global sort + Kruskal DSU (Numba JIT).
+    6. Bridge disconnected components with +inf edges.
+
+    Parameters
+    ----------
+    X : scipy sparse matrix, shape (n, n)
+        Pairwise distance/weight graph. Missing entries = no edge (+inf).
+    min_samples : int
+        Number of neighbors to use for core distance computation.
+
+    Returns
+    -------
+    edges : np.ndarray, shape (n-1, 3), columns [src, dst, mrd_weight]
+    neighbors : np.ndarray, int32, shape (n, k)
+    core_distances : np.ndarray, float64, shape (n,)
+    """
+    from .kruskal import kruskal_mst_from_csr
+
+    validate_precomputed_sparse_graph(X)
+    n = X.shape[0]
+
+    # 1. Symmetrize: min weight per undirected pair, no diagonal.
+    X_sym = _symmetrize_min_csr(X)
+
+    # 2. Core distances and nearest-neighbor indices (parallel over nodes).
+    neighbors, core_distances = _core_distances_csr(
+        X_sym.data, X_sym.indices, X_sym.indptr, min_samples
+    )
+
+    # 3. Kruskal MST (float64 throughout — no patching needed).
+    n_components, component_labels, mst_edges = kruskal_mst_from_csr(
+        X_sym.data, X_sym.indices, X_sym.indptr, core_distances
+    )
+
+    # 4. Bridge disconnected components with +inf edges.
+    if n_components > 1:
+        mst_edges = bridge_forest_with_inf(mst_edges, component_labels, n)
 
     return mst_edges, neighbors, core_distances

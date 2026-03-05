@@ -170,7 +170,7 @@ def update_graph_components(distances, indices, indptr, point_components):
 
 
 @numba.njit(cache=NUMBA_CACHE)
-def minimum_spanning_tree(graph, overwrite=False):
+def boruvka_mst(graph, overwrite=False):
     """
     Implements Boruvka on lod-style graph with multiple connected components.
     """
@@ -215,7 +215,7 @@ def core_graph_spanning_tree(neighbors, core_distances, min_spanning_tree, lens)
             knn_mst_union(neighbors, core_distances, min_spanning_tree, lens)
         )
     )
-    return (*minimum_spanning_tree(graph), graph)
+    return (*boruvka_mst(graph), graph)
 
 
 def core_graph_clusters(
