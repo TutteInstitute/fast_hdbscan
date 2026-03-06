@@ -257,6 +257,12 @@ def find_sub_clusters(
     cluster_selection_persistence=0.0,
     propagate_labels=False,
 ):
+    if getattr(clusterer, "metric", "euclidean") == "precomputed":
+        raise NotImplementedError(
+            "SubClusterDetector and BranchDetector are not supported for models "
+            "fitted with metric='precomputed'. These detectors require raw feature "
+            "vectors to compute lens values."
+        )
     check_is_fitted(
         clusterer,
         "_min_spanning_tree",
