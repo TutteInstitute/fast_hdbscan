@@ -157,6 +157,8 @@ def fast_hdbscan(
     metric="euclidean",
     algorithm="boruvka",
     knn_k=None,
+    cannot_link=None,
+    validate_cannot_link=True,
 ):
     if metric == "precomputed":
         if sample_weights is not None:
@@ -211,6 +213,8 @@ def fast_hdbscan(
         metric=metric,
         algorithm=algorithm,
         knn_k=knn_k,
+        cannot_link=cannot_link,
+        validate_cannot_link=validate_cannot_link,
     )
 
     return (
@@ -240,6 +244,8 @@ def compute_minimum_spanning_tree(
     metric="euclidean",
     algorithm="boruvka",
     knn_k=None,
+    cannot_link=None,
+    validate_cannot_link=True,
 ):
     """
     Compute the minimum spanning tree for HDBSCAN.
@@ -265,10 +271,24 @@ def compute_minimum_spanning_tree(
         Only used when algorithm='kruskal' and metric='euclidean'.
         - None : exact MST via full pairwise distances (O(n^2) memory).
         - int  : approximate MST via KNN subgraph with this many neighbors.
+    cannot_link : scipy sparse matrix or None
+        Symmetric sparse matrix of cannot-link constraints.  Only supported
+        with algorithm='kruskal'.
+    validate_cannot_link : bool
+        If True (default), validate and symmetrize the cannot-link matrix
+        (handles upper-triangle-only and lower-triangle-only inputs).
+        Set to False to skip validation when you know the input is already
+        a symmetric CSR matrix — avoids an O(nnz) symmetrization step.
     """
     if algorithm not in ("boruvka", "kruskal"):
         raise ValueError(
             "algorithm must be 'boruvka' or 'kruskal'. Got: %s" % algorithm
+        )
+
+    if cannot_link is not None and algorithm != "kruskal":
+        raise ValueError(
+            "cannot_link constraints are only supported with "
+            "algorithm='kruskal'. Got algorithm=%r." % algorithm
         )
 
     if metric == "precomputed":
@@ -279,7 +299,10 @@ def compute_minimum_spanning_tree(
         if algorithm == "kruskal":
             from .precomputed import compute_mst_from_precomputed_sparse_kruskal
 
-            return compute_mst_from_precomputed_sparse_kruskal(data, min_samples)
+            return compute_mst_from_precomputed_sparse_kruskal(
+                data, min_samples, cannot_link=cannot_link,
+                validate_cannot_link=validate_cannot_link,
+            )
         else:
             from .precomputed import compute_mst_from_precomputed_sparse
 
@@ -297,6 +320,8 @@ def compute_minimum_spanning_tree(
             knn_k=knn_k,
             sample_weights=sample_weights,
             reproducible=reproducible,
+            cannot_link=cannot_link,
+            validate_cannot_link=validate_cannot_link,
         )
     else:
         n_threads = numba.get_num_threads()
@@ -407,6 +432,8 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         metric="euclidean",
         algorithm="boruvka",
         knn_k=None,
+        cannot_link=None,
+        validate_cannot_link=True,
         # Removed **kwargs to comply with scikit-learn's API requirements
     ):
         self.min_cluster_size = min_cluster_size
@@ -422,6 +449,8 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.metric = metric
         self.algorithm = algorithm
         self.knn_k = knn_k
+        self.cannot_link = cannot_link
+        self.validate_cannot_link = validate_cannot_link
 
     def fit(self, X, y=None, sample_weight=None, **fit_params):
 

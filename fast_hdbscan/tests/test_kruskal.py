@@ -502,3 +502,566 @@ def test_fast_hdbscan_knn_k_param():
     )
     assert labels.shape == (_X_blobs.shape[0],)
     assert len(set(labels) - {-1}) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Cannot-link constrained Kruskal tests
+# ---------------------------------------------------------------------------
+
+def _make_cl_matrix(n, pairs):
+    """Build a sparse CL matrix from a list of (i, j) pairs (upper-tri only)."""
+    if not pairs:
+        return sparse.csr_matrix((n, n), dtype=np.int8)
+    rows, cols = zip(*pairs)
+    data = np.ones(len(pairs), dtype=np.int8)
+    return sparse.csr_matrix((data, (rows, cols)), shape=(n, n))
+
+
+class TestCannotLinkCore:
+    """Tests for _kruskal_core_constrained JIT function."""
+
+    def test_basic_cl_prevents_merge(self):
+        """CL(0, 2) on a 3-node path: 0--1--2.  Must produce 2 components."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+        # Path graph: 0-1 (w=1), 1-2 (w=2)
+        weights = np.array([1.0, 2.0], dtype=np.float64)
+        row_idx = np.array([0, 1], dtype=np.int32)
+        col_idx = np.array([1, 2], dtype=np.int32)
+        sorted_order = np.array([0, 1], dtype=np.int32)
+
+        cl = _make_cl_matrix(3, [(0, 2)])
+        cl_indices, cl_indptr = _validate_cannot_link(cl, 3)
+
+        mst_edges, preds = _kruskal_core_constrained(
+            weights, row_idx, col_idx, sorted_order, 3, cl_indices, cl_indptr
+        )
+        # Edge 0-1 accepted; edge 1-2 would merge {0,1} with {2},
+        # but CL(0,2) forbids it.
+        assert mst_edges.shape[0] == 1
+        assert mst_edges[0, 0] == 0 and mst_edges[0, 1] == 1
+
+    def test_cl_no_constraints_matches_unconstrained(self):
+        """Empty CL matrix gives same result as unconstrained Kruskal."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core, _kruskal_core_constrained, _validate_cannot_link,
+        )
+        rng = np.random.RandomState(42)
+        n = 8
+        # Random complete graph (upper-triangle)
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = rng.uniform(0.1, 5.0, size=len(tri_r)).astype(np.float64)
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        cl = _make_cl_matrix(n, [])
+        cl_i, cl_p = _validate_cannot_link(cl, n)
+
+        mst_u, _ = _kruskal_core(weights, tri_r, tri_c, so, n)
+        mst_c, _ = _kruskal_core_constrained(
+            weights, tri_r, tri_c, so, n, cl_i, cl_p
+        )
+        np.testing.assert_array_equal(mst_u, mst_c)
+
+    def test_cl_transitive_conflict(self):
+        """CL(0, 3): merging {0,1,2} with {3} is blocked even though
+        edge 2-3 doesn't directly involve vertex 0."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+        # Edges: 0-1(1), 1-2(2), 2-3(3)
+        weights = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        row_idx = np.array([0, 1, 2], dtype=np.int32)
+        col_idx = np.array([1, 2, 3], dtype=np.int32)
+        so = np.array([0, 1, 2], dtype=np.int32)
+
+        cl = _make_cl_matrix(4, [(0, 3)])
+        cl_i, cl_p = _validate_cannot_link(cl, 4)
+
+        mst_edges, _ = _kruskal_core_constrained(
+            weights, row_idx, col_idx, so, 4, cl_i, cl_p
+        )
+        # 0-1 and 1-2 accepted; 2-3 rejected (would merge comp with 0 and 3)
+        assert mst_edges.shape[0] == 2
+
+    def test_cl_multiple_constraints(self):
+        """Multiple CL pairs fragment the graph into multiple components."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+            _get_component_labels_jit,
+        )
+        # Complete graph on 6 vertices, all weight=1
+        n = 6
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = np.ones(len(tri_r), dtype=np.float64)
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.arange(len(weights), dtype=np.int32)
+
+        # CL: (0,3), (1,4), (2,5) — forces 3 separate groups
+        cl = _make_cl_matrix(n, [(0, 3), (1, 4), (2, 5)])
+        cl_i, cl_p = _validate_cannot_link(cl, n)
+
+        mst_edges, preds = _kruskal_core_constrained(
+            weights, tri_r, tri_c, so, n, cl_i, cl_p
+        )
+        labels = _get_component_labels_jit(preds)
+        n_comps = len(np.unique(labels))
+        # Each CL pair forces at least 2 components; 3 cross-cutting CLs
+        # on 6 nodes should give at least 2 components
+        assert n_comps >= 2
+        # Verify no CL pair shares a component
+        for a, b in [(0, 3), (1, 4), (2, 5)]:
+            assert labels[a] != labels[b], f"CL pair ({a},{b}) in same component"
+
+
+class TestCannotLinkValidation:
+    """Tests for _validate_cannot_link."""
+
+    def test_upper_triangle_only(self):
+        """Upper-triangle CL input produces symmetric CSR."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        cl = _make_cl_matrix(5, [(0, 3), (1, 4)])
+        cl_i, cl_p = _validate_cannot_link(cl, 5)
+        # Should have 4 entries (2 pairs × 2 directions)
+        assert len(cl_i) == 4
+
+    def test_symmetric_input_deduplicates(self):
+        """Symmetric CL input is deduplicated to the same result."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        # Build full symmetric CL
+        cl_sym = _make_cl_matrix(5, [(0, 3), (1, 4)])
+        cl_sym = cl_sym + cl_sym.T
+        cl_i, cl_p = _validate_cannot_link(cl_sym, 5)
+        assert len(cl_i) == 4
+
+    def test_lower_triangle_input(self):
+        """Lower-triangle CL input is also accepted."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        cl_lower = _make_cl_matrix(5, [(3, 0), (4, 1)])  # lower-tri
+        cl_i, cl_p = _validate_cannot_link(cl_lower, 5)
+        assert len(cl_i) == 4
+
+    def test_diagonal_harmless(self):
+        """Diagonal entries are passed through but harmless (self-loops)."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        # Diagonal-only matrix: no real constraints, algorithm should
+        # behave identically to unconstrained (self-loops never fire).
+        cl = sparse.eye(4, dtype=np.int8, format="csr")
+        cl_i, cl_p = _validate_cannot_link(cl, 4)
+        # Diagonal entries are kept (no sanitization), but they are
+        # harmless self-loops in the conflict list.
+        assert len(cl_i) == 4
+
+    def test_empty_cl(self):
+        """Empty CL matrix returns empty arrays."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        cl = sparse.csr_matrix((5, 5), dtype=np.int8)
+        cl_i, cl_p = _validate_cannot_link(cl, 5)
+        assert len(cl_i) == 0
+        assert len(cl_p) == 6
+
+    def test_wrong_shape_raises(self):
+        """CL matrix with wrong shape raises ValueError."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        cl = sparse.csr_matrix((3, 3), dtype=np.int8)
+        with pytest.raises(ValueError, match="does not match"):
+            _validate_cannot_link(cl, 5)
+
+    def test_non_sparse_raises(self):
+        """Dense array as CL raises ValueError."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        with pytest.raises(ValueError, match="sparse"):
+            _validate_cannot_link(np.eye(3), 3)
+
+    def test_validate_false_skips_symmetrization(self):
+        """validate=False passes through CSR indices/indptr directly."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        # Build a symmetric CL matrix manually
+        cl_sym = _make_cl_matrix(5, [(0, 3), (1, 4)])
+        cl_sym = cl_sym + cl_sym.T  # make symmetric
+        cl_csr = sparse.csr_matrix(cl_sym)
+
+        cl_i_val, cl_p_val = _validate_cannot_link(cl_csr, 5, validate=True)
+        cl_i_novalidate, cl_p_novalidate = _validate_cannot_link(
+            cl_csr, 5, validate=False
+        )
+
+        # Same result for already-symmetric input
+        np.testing.assert_array_equal(
+            np.sort(cl_i_novalidate), np.sort(cl_i_val)
+        )
+
+    def test_validate_false_entry_point(self):
+        """validate_cannot_link=False works through fast_hdbscan()."""
+        X = _X_blobs.copy()
+        n = X.shape[0]
+        # Build symmetric CL
+        cl = _make_cl_matrix(n, [(0, 30)])
+        cl = cl + cl.T
+
+        labels, probs = fast_hdbscan(
+            X, min_cluster_size=5, min_samples=3,
+            algorithm="kruskal", knn_k=10, cannot_link=cl,
+            validate_cannot_link=False,
+        )
+        assert labels.shape == (n,)
+
+
+class TestCannotLinkEntryPoints:
+    """Tests for CL constraints through public entry points."""
+
+    def test_feature_matrix_brute_cl(self):
+        """knn_k=None (brute-force) with CL constraints."""
+        n = 20
+        rng = np.random.RandomState(99)
+        X = rng.randn(n, 2).astype(np.float64)
+        # CL between first and last point
+        cl = _make_cl_matrix(n, [(0, n - 1)])
+
+        labels, probs = fast_hdbscan(
+            X, min_cluster_size=3, min_samples=2,
+            algorithm="kruskal", knn_k=None, cannot_link=cl,
+        )
+        assert labels.shape == (n,)
+
+    def test_feature_matrix_knn_cl(self):
+        """knn_k=10 with CL constraints."""
+        X = _X_blobs.copy()
+        n = X.shape[0]
+        # CL between two points from different blobs
+        cl = _make_cl_matrix(n, [(0, 30)])
+
+        labels, probs = fast_hdbscan(
+            X, min_cluster_size=5, min_samples=3,
+            algorithm="kruskal", knn_k=10, cannot_link=cl,
+        )
+        assert labels.shape == (n,)
+
+    def test_precomputed_cl(self):
+        """metric='precomputed' + algorithm='kruskal' + cannot_link."""
+        G = _G_blobs.copy()
+        n = G.shape[0]
+        cl = _make_cl_matrix(n, [(0, n - 1)])
+
+        labels, probs = fast_hdbscan(
+            G, min_cluster_size=5, min_samples=3,
+            metric="precomputed", algorithm="kruskal", cannot_link=cl,
+        )
+        assert labels.shape == (n,)
+
+    def test_hdbscan_class_cl(self):
+        """HDBSCAN class API with cannot_link."""
+        X = _X_blobs.copy()
+        n = X.shape[0]
+        cl = _make_cl_matrix(n, [(0, n - 1)])
+
+        h = HDBSCAN(
+            min_cluster_size=5, min_samples=3,
+            algorithm="kruskal", knn_k=10, cannot_link=cl,
+        ).fit(X)
+        assert h.labels_.shape == (n,)
+
+    def test_cl_enforced_in_labels(self):
+        """Points linked by CL constraint end up in different clusters or noise."""
+        # Create well-separated blobs with a cross-blob CL
+        rng = np.random.RandomState(7)
+        X_a = rng.randn(15, 2) + np.array([-5, 0])
+        X_b = rng.randn(15, 2) + np.array([5, 0])
+        X = np.vstack([X_a, X_b])
+        n = X.shape[0]
+
+        # CL between point 0 (blob A) and point 7 (blob A) — forces split
+        cl = _make_cl_matrix(n, [(0, 7)])
+
+        labels, _ = fast_hdbscan(
+            X, min_cluster_size=3, min_samples=2,
+            algorithm="kruskal", knn_k=None, cannot_link=cl,
+        )
+        # Either different clusters or at least one is noise
+        if labels[0] != -1 and labels[7] != -1:
+            assert labels[0] != labels[7], \
+                "CL-constrained points should not share a cluster"
+
+    def test_boruvka_with_cl_raises(self):
+        """algorithm='boruvka' + cannot_link raises ValueError."""
+        cl = _make_cl_matrix(10, [(0, 5)])
+        with pytest.raises(ValueError, match="cannot_link"):
+            compute_minimum_spanning_tree(
+                np.random.randn(10, 2), algorithm="boruvka", cannot_link=cl,
+            )
+
+    def test_cl_none_matches_unconstrained(self):
+        """cannot_link=None gives identical results to no CL."""
+        labels_none, _ = fast_hdbscan(
+            _X_blobs, min_cluster_size=5, algorithm="kruskal", knn_k=10,
+            cannot_link=None,
+        )
+        labels_no_param, _ = fast_hdbscan(
+            _X_blobs, min_cluster_size=5, algorithm="kruskal", knn_k=10,
+        )
+        np.testing.assert_array_equal(labels_none, labels_no_param)
+
+
+# ---------------------------------------------------------------------------
+# Accuracy tests for constrained Kruskal
+# ---------------------------------------------------------------------------
+
+def _has_cl_violations(predecessors, cl_rows, cl_cols):
+    """Vectorized: resolve DSU roots, return True if any CL pair shares one."""
+    roots = predecessors.copy()
+    while True:
+        new_roots = predecessors[roots]
+        if np.array_equal(new_roots, roots):
+            break
+        roots = new_roots
+    return np.any(roots[cl_rows] == roots[cl_cols])
+
+
+class TestCannotLinkAccuracy:
+    """Topology, optimality, and stress tests for constrained Kruskal."""
+
+    # ------------------------------------------------------------------
+    # Planning-agent topology tests
+    # ------------------------------------------------------------------
+
+    def test_transitive_trap(self):
+        """A-B(1), C-D(1), B-C(5), CL(A,D).
+        Both cheap merges happen first; B-C must be rejected because {A,B}
+        and {C,D} carry a transitive conflict."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+            _get_component_labels_jit,
+        )
+        # A=0 B=1 C=2 D=3
+        weights = np.array([1.0, 1.0, 5.0], dtype=np.float64)
+        rows = np.array([0, 2, 1], dtype=np.int32)
+        cols = np.array([1, 3, 2], dtype=np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        cl = _make_cl_matrix(4, [(0, 3)])
+        cl_i, cl_p = _validate_cannot_link(cl, 4)
+
+        mst, preds = _kruskal_core_constrained(
+            weights, rows, cols, so, 4, cl_i, cl_p
+        )
+        labels = _get_component_labels_jit(preds)
+        # Two components: {A,B} and {C,D}
+        assert len(np.unique(labels)) == 2
+        assert labels[0] == labels[1]  # A,B together
+        assert labels[2] == labels[3]  # C,D together
+        assert labels[0] != labels[2]  # separated
+        # Exactly 2 edges accepted (A-B, C-D); B-C rejected
+        assert mst.shape[0] == 2
+
+    def test_redundant_constraint(self):
+        """Triangle A-C(1), B-C(2), A-B(3), CL(A,B).
+        A-C merges first.  Then B-C is rejected because B's constraint
+        against A is inherited by the {A,C} component.  A-B also rejected."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+            _get_component_labels_jit,
+        )
+        # A=0, B=1, C=2.  Edges sorted by weight: A-C(1), B-C(2), A-B(3).
+        weights = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        rows = np.array([0, 1, 0], dtype=np.int32)
+        cols = np.array([2, 2, 1], dtype=np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        cl = _make_cl_matrix(3, [(0, 1)])
+        cl_i, cl_p = _validate_cannot_link(cl, 3)
+
+        mst, preds = _kruskal_core_constrained(
+            weights, rows, cols, so, 3, cl_i, cl_p
+        )
+        labels = _get_component_labels_jit(preds)
+        # Only A-C accepted.  B isolated.
+        assert mst.shape[0] == 1
+        assert labels[0] == labels[2]
+        assert labels[1] != labels[0]
+
+    def test_fully_constrained(self):
+        """Every pair constrained -> zero edges accepted."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+        n = 6
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = np.arange(len(tri_r), dtype=np.float64)
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        # All pairs constrained
+        cl_pairs = list(zip(tri_r.tolist(), tri_c.tolist()))
+        cl = _make_cl_matrix(n, cl_pairs)
+        cl_i, cl_p = _validate_cannot_link(cl, n)
+
+        mst, _ = _kruskal_core_constrained(
+            weights, tri_r, tri_c, so, n, cl_i, cl_p
+        )
+        assert mst.shape[0] == 0
+
+    def test_scipy_equivalence_unconstrained(self):
+        """Empty constraints -> MST weight matches scipy.sparse.csgraph."""
+        from scipy.sparse.csgraph import minimum_spanning_tree as scipy_mst
+        from fast_hdbscan.kruskal import _kruskal_core
+
+        G = _make_connected_sparse_graph(n=20, seed=42)
+        n = G.shape[0]
+
+        # scipy MST
+        sp_weight = scipy_mst(G).data.sum()
+
+        # Our Kruskal on upper-triangle edges
+        upper = sparse.triu(G, k=1).tocoo()
+        rows = upper.row.astype(np.int32)
+        cols = upper.col.astype(np.int32)
+        weights = upper.data.astype(np.float64)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        mst, _ = _kruskal_core(weights, rows, cols, so, n)
+        np.testing.assert_allclose(mst[:, 2].sum(), sp_weight, rtol=1e-10)
+
+    # ------------------------------------------------------------------
+    # Universal validator (stress)
+    # ------------------------------------------------------------------
+
+    def test_universal_validator_random_stress(self):
+        """Random graphs x random CL: no violations, min 100 trials, max 10s."""
+        import time
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+
+        min_trials = 100
+        max_seconds = 10.0
+        start = time.perf_counter()
+        trial = 0
+        while trial < min_trials or time.perf_counter() - start < max_seconds:
+            rng = np.random.RandomState(trial + 7000)
+            n = rng.randint(10, 45)
+            tri_r, tri_c = np.triu_indices(n, k=1)
+            n_possible = len(tri_r)
+
+            # Edge graph: 40-70% density
+            n_edges = rng.randint(
+                max(n, int(n_possible * 0.4)),
+                max(n + 1, int(n_possible * 0.7) + 1),
+            )
+            n_edges = min(n_edges, n_possible)
+            idx = rng.choice(n_possible, n_edges, replace=False)
+            rows = tri_r[idx].astype(np.int32)
+            cols = tri_c[idx].astype(np.int32)
+            weights = rng.uniform(0.1, 10.0, n_edges).astype(np.float64)
+            so = np.argsort(weights, kind="stable").astype(np.int32)
+
+            # CL: 10-30% density
+            n_cl = rng.randint(
+                max(1, int(n_possible * 0.1)),
+                max(2, int(n_possible * 0.3) + 1),
+            )
+            n_cl = min(n_cl, n_possible)
+            cl_idx = rng.choice(n_possible, n_cl, replace=False)
+            cl_rows = tri_r[cl_idx]
+            cl_cols = tri_c[cl_idx]
+            cl_data = np.ones(n_cl, dtype=np.int8)
+            cl_mat = sparse.csr_matrix(
+                (cl_data, (cl_rows, cl_cols)), shape=(n, n)
+            )
+            cl_i, cl_p = _validate_cannot_link(cl_mat, n)
+
+            _, preds = _kruskal_core_constrained(
+                weights, rows, cols, so, n, cl_i, cl_p
+            )
+            assert not _has_cl_violations(preds, cl_rows, cl_cols), (
+                f"CL violation at trial {trial} (n={n}, "
+                f"edges={n_edges}, cl={n_cl}, seed={trial + 7000})"
+            )
+            trial += 1
+
+        elapsed = time.perf_counter() - start
+        assert trial >= min_trials, f"Only {trial} trials completed"
+        # Diagnostic: print throughput so we can gauge CI performance
+        rate = trial / elapsed
+        print(f"\n  stress: {trial} trials in {elapsed:.2f}s ({rate:.0f} trials/s)")
+
+    # ------------------------------------------------------------------
+    # Non-interference
+    # ------------------------------------------------------------------
+
+    def test_non_interference(self):
+        """CL between nodes already in different MST components
+        produces bitwise-identical edges."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core, _kruskal_core_constrained,
+            _validate_cannot_link, _get_component_labels_jit,
+        )
+        rng = np.random.RandomState(55)
+        n = 20
+        half = n // 2
+
+        # Two disconnected complete subgraphs: [0, half) and [half, n)
+        pairs = []
+        for i in range(half):
+            for j in range(i + 1, half):
+                pairs.append((i, j))
+        for i in range(half, n):
+            for j in range(i + 1, n):
+                pairs.append((i, j))
+        pairs = np.array(pairs)
+        weights = rng.uniform(0.1, 5.0, len(pairs)).astype(np.float64)
+        rows = pairs[:, 0].astype(np.int32)
+        cols = pairs[:, 1].astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        # Unconstrained
+        mst_u, preds_u = _kruskal_core(weights, rows, cols, so, n)
+        labels = _get_component_labels_jit(preds_u)
+        assert len(np.unique(labels)) == 2, "graph should be disconnected"
+        assert labels[0] != labels[half], "nodes 0 and half should be in different components"
+
+        # Constrained: CL between one node in each component
+        cl = _make_cl_matrix(n, [(0, half)])
+        cl_i, cl_p = _validate_cannot_link(cl, n)
+        mst_c, _ = _kruskal_core_constrained(
+            weights, rows, cols, so, n, cl_i, cl_p
+        )
+
+        np.testing.assert_array_equal(mst_u, mst_c)
+
+    # ------------------------------------------------------------------
+    # Dynamic transitivity
+    # ------------------------------------------------------------------
+
+    def test_dynamic_transitivity(self):
+        """Line A-B(10), B-C(1), C-D(10), CL(A,D).
+        B-C is cheapest, so {B,C} forms first.  A-B merges A into {B,C}
+        (no conflict — D is still isolated).  Then C-D must be rejected
+        because A is now in {A,B,C} and CL(A,D) blocks the merge."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+        # A=0, B=1, C=2, D=3
+        weights = np.array([10.0, 1.0, 10.0], dtype=np.float64)
+        rows = np.array([0, 1, 2], dtype=np.int32)
+        cols = np.array([1, 2, 3], dtype=np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        cl = _make_cl_matrix(4, [(0, 3)])
+        cl_i, cl_p = _validate_cannot_link(cl, 4)
+
+        mst, preds = _kruskal_core_constrained(
+            weights, rows, cols, so, 4, cl_i, cl_p
+        )
+
+        # Two edges accepted: B-C(1) and A-B(10)
+        assert mst.shape[0] == 2
+        edge_pairs = set(
+            (int(mst[i, 0]), int(mst[i, 1])) for i in range(mst.shape[0])
+        )
+        assert (1, 2) in edge_pairs, "B-C should be in MSF"
+        assert (0, 1) in edge_pairs, "A-B should be in MSF"
+        assert (2, 3) not in edge_pairs, "C-D must be rejected"
