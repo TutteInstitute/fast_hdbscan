@@ -426,7 +426,9 @@ def compute_mst_from_precomputed_sparse(X, min_samples):
     return mst_edges, neighbors, core_distances
 
 
-def compute_mst_from_precomputed_sparse_kruskal(X, min_samples, cannot_link=None):
+def compute_mst_from_precomputed_sparse_kruskal(
+    X, min_samples, cannot_link=None, validate_cannot_link=True,
+):
     """
     Compute the MST from a scipy sparse precomputed pairwise weight matrix
     using Kruskal's algorithm.
@@ -451,6 +453,9 @@ def compute_mst_from_precomputed_sparse_kruskal(X, min_samples, cannot_link=None
         Number of neighbors to use for core distance computation.
     cannot_link : scipy sparse matrix or None
         Boolean cannot-link constraints.
+    validate_cannot_link : bool
+        If True (default), validate and symmetrize the cannot-link matrix.
+        Set to False when you know the input is already a symmetric CSR.
 
     Returns
     -------
@@ -474,7 +479,9 @@ def compute_mst_from_precomputed_sparse_kruskal(X, min_samples, cannot_link=None
     # 3. Validate CL constraints if provided.
     cl_indices, cl_indptr = None, None
     if cannot_link is not None:
-        cl_indices, cl_indptr = _validate_cannot_link(cannot_link, n)
+        cl_indices, cl_indptr = _validate_cannot_link(
+            cannot_link, n, validate=validate_cannot_link
+        )
 
     # 4. Kruskal MST (float64 throughout — no patching needed).
     n_components, component_labels, mst_edges = kruskal_mst_from_csr(

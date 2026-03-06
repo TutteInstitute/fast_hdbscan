@@ -644,12 +644,16 @@ class TestCannotLinkValidation:
         cl_i, cl_p = _validate_cannot_link(cl_lower, 5)
         assert len(cl_i) == 4
 
-    def test_diagonal_ignored(self):
-        """Diagonal entries are silently dropped."""
+    def test_diagonal_harmless(self):
+        """Diagonal entries are passed through but harmless (self-loops)."""
         from fast_hdbscan.kruskal import _validate_cannot_link
+        # Diagonal-only matrix: no real constraints, algorithm should
+        # behave identically to unconstrained (self-loops never fire).
         cl = sparse.eye(4, dtype=np.int8, format="csr")
         cl_i, cl_p = _validate_cannot_link(cl, 4)
-        assert len(cl_i) == 0
+        # Diagonal entries are kept (no sanitization), but they are
+        # harmless self-loops in the conflict list.
+        assert len(cl_i) == 4
 
     def test_empty_cl(self):
         """Empty CL matrix returns empty arrays."""
@@ -671,6 +675,39 @@ class TestCannotLinkValidation:
         from fast_hdbscan.kruskal import _validate_cannot_link
         with pytest.raises(ValueError, match="sparse"):
             _validate_cannot_link(np.eye(3), 3)
+
+    def test_validate_false_skips_symmetrization(self):
+        """validate=False passes through CSR indices/indptr directly."""
+        from fast_hdbscan.kruskal import _validate_cannot_link
+        # Build a symmetric CL matrix manually
+        cl_sym = _make_cl_matrix(5, [(0, 3), (1, 4)])
+        cl_sym = cl_sym + cl_sym.T  # make symmetric
+        cl_csr = sparse.csr_matrix(cl_sym)
+
+        cl_i_val, cl_p_val = _validate_cannot_link(cl_csr, 5, validate=True)
+        cl_i_novalidate, cl_p_novalidate = _validate_cannot_link(
+            cl_csr, 5, validate=False
+        )
+
+        # Same result for already-symmetric input
+        np.testing.assert_array_equal(
+            np.sort(cl_i_novalidate), np.sort(cl_i_val)
+        )
+
+    def test_validate_false_entry_point(self):
+        """validate_cannot_link=False works through fast_hdbscan()."""
+        X = _X_blobs.copy()
+        n = X.shape[0]
+        # Build symmetric CL
+        cl = _make_cl_matrix(n, [(0, 30)])
+        cl = cl + cl.T
+
+        labels, probs = fast_hdbscan(
+            X, min_cluster_size=5, min_samples=3,
+            algorithm="kruskal", knn_k=10, cannot_link=cl,
+            validate_cannot_link=False,
+        )
+        assert labels.shape == (n,)
 
 
 class TestCannotLinkEntryPoints:

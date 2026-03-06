@@ -367,28 +367,39 @@ def _build_mrd_edges_knn(knn_indices, knn_dists, core_distances):
 # Public entry points
 # ---------------------------------------------------------------------------
 
-def _validate_cannot_link(cannot_link, n):
+def _validate_cannot_link(cannot_link, n, validate=True):
     """
     Validate and normalize a cannot-link constraint matrix.
 
-    Extracts unique undirected pairs from any sparse matrix (only the upper
-    triangle is needed; lower-triangle and symmetric inputs also work).
-    Diagonal entries are ignored.  Returns a symmetric CSR suitable for the
-    JIT conflict-list initializer.
+    The input should be a **symmetric** sparse matrix where non-zero entry
+    (i, j) marks a cannot-link constraint between vertices i and j.
+    Diagonal entries are harmless and ignored by the algorithm.
 
     Parameters
     ----------
     cannot_link : scipy sparse matrix, shape (n, n)
-        Any non-zero entry (i, j) with i != j marks a CL constraint.
+        Symmetric sparse matrix of CL constraints.
     n : int
         Number of vertices.
+    validate : bool
+        If True (default), check shape/type and symmetrize via
+        ``cl_csr + cl_csr.T``.  If False, skip all checks and
+        symmetrization — the caller guarantees a symmetric CSR matrix
+        of the correct shape.  This avoids an O(nnz) symmetrization
+        step that dominates runtime for large constraint matrices.
 
     Returns
     -------
-    cl_indices : int32[:], CSR column indices (symmetric CL graph)
+    cl_indices : int32[:], CSR column indices
     cl_indptr  : int32[:], CSR row pointers (length n+1)
     """
     import scipy.sparse
+
+    if not validate:
+        cl_csr = scipy.sparse.csr_matrix(cannot_link)
+        if cl_csr.nnz == 0:
+            return np.empty(0, dtype=np.int32), np.zeros(n + 1, dtype=np.int32)
+        return cl_csr.indices.astype(np.int32), cl_csr.indptr.astype(np.int32)
 
     if not scipy.sparse.issparse(cannot_link):
         raise ValueError("cannot_link must be a scipy sparse matrix.")
@@ -399,36 +410,15 @@ def _validate_cannot_link(cannot_link, n):
             f"data size ({n}, {n})."
         )
 
-    coo = scipy.sparse.coo_matrix(cannot_link)
-    rows, cols = coo.row, coo.col
+    cl_csr = scipy.sparse.csr_matrix(cannot_link)
 
-    # Remove diagonal
-    off_diag = rows != cols
-    rows, cols = rows[off_diag], cols[off_diag]
+    if cl_csr.nnz == 0:
+        return np.empty(0, dtype=np.int32), np.zeros(n + 1, dtype=np.int32)
 
-    if len(rows) == 0:
-        cl_indptr = np.zeros(n + 1, dtype=np.int32)
-        cl_indices = np.empty(0, dtype=np.int32)
-        return cl_indices, cl_indptr
+    # Symmetrize (handles upper-only, lower-only, or already symmetric).
+    cl_sym = cl_csr + cl_csr.T
 
-    # Canonicalize to upper triangle: u = min(i,j), v = max(i,j)
-    u = np.minimum(rows, cols)
-    v = np.maximum(rows, cols)
-
-    # Deduplicate (u, v) pairs
-    pairs = np.unique(np.column_stack([u, v]), axis=0)
-
-    # Build symmetric edge list (both directions)
-    sym_rows = np.concatenate([pairs[:, 0], pairs[:, 1]])
-    sym_cols = np.concatenate([pairs[:, 1], pairs[:, 0]])
-    sym_data = np.ones(len(sym_rows), dtype=np.int8)
-
-    cl_csr = scipy.sparse.csr_matrix(
-        (sym_data, (sym_rows, sym_cols)), shape=(n, n)
-    )
-    cl_csr.sort_indices()
-
-    return cl_csr.indices.astype(np.int32), cl_csr.indptr.astype(np.int32)
+    return cl_sym.indices.astype(np.int32), cl_sym.indptr.astype(np.int32)
 
 
 def kruskal_mst_from_csr(sym_data, sym_indices, sym_indptr, core_distances,
@@ -509,6 +499,7 @@ def kruskal_mst_from_feature_matrix(
     sample_weights=None,
     reproducible=False,  # noqa: ARG001  (Kruskal is always deterministic)
     cannot_link=None,
+    validate_cannot_link=True,
 ):
     """
     Kruskal MST for feature data.
@@ -527,9 +518,12 @@ def kruskal_mst_from_feature_matrix(
     reproducible  : bool
         Ignored; Kruskal is inherently deterministic.
     cannot_link   : scipy sparse matrix or None
-        Boolean sparse matrix of cannot-link constraints.  Only the upper
-        triangle is required; symmetric and lower-triangle inputs also work.
+        Boolean sparse matrix of cannot-link constraints.  Must be symmetric.
         Diagonal entries are ignored.
+    validate_cannot_link : bool
+        If True (default), validate and symmetrize the cannot-link matrix.
+        Set to False to skip validation when you know the input is already
+        a symmetric CSR matrix — saves O(nnz) time on large matrices.
 
     Returns
     -------
@@ -540,7 +534,9 @@ def kruskal_mst_from_feature_matrix(
     cl_indices, cl_indptr = None, None
     if cannot_link is not None:
         n = numba_tree.data.shape[0]
-        cl_indices, cl_indptr = _validate_cannot_link(cannot_link, n)
+        cl_indices, cl_indptr = _validate_cannot_link(
+            cannot_link, n, validate=validate_cannot_link
+        )
 
     if knn_k is None:
         if sample_weights is not None:
