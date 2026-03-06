@@ -1,0 +1,4373 @@
+{
+  "timestamp": "2026-03-05T19:13:48.503032+00:00",
+  "mode": "full",
+  "n_benchmarks": 181,
+  "total_elapsed_sec": 290.93,
+  "results": [
+    {
+      "elapsed_sec": 0.002023,
+      "peak_mem_bytes": 44855,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n200",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 200,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.002018,
+      "peak_mem_bytes": 216960,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n200",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 200,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.002854,
+      "peak_mem_bytes": 103951,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n500",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.002737,
+      "peak_mem_bytes": 533400,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n500",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.005179,
+      "peak_mem_bytes": 202119,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n1000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.004557,
+      "peak_mem_bytes": 1061016,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n1000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.008367,
+      "peak_mem_bytes": 398471,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n2000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.006876,
+      "peak_mem_bytes": 2116248,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n2000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.024314,
+      "peak_mem_bytes": 986071,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n5000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.02097,
+      "peak_mem_bytes": 5278712,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n5000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.070699,
+      "peak_mem_bytes": 1962999,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n10000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.042831,
+      "peak_mem_bytes": 10551640,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n10000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.218976,
+      "peak_mem_bytes": 4889215,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n25000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 25000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.144333,
+      "peak_mem_bytes": 26409158,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n25000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 25000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.553399,
+      "peak_mem_bytes": 9753239,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n50000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.385275,
+      "peak_mem_bytes": 52812632,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n50000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 1.637021,
+      "peak_mem_bytes": 19460829,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "boruvka_n100000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.931794,
+      "peak_mem_bytes": 105619430,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_knn_20_n100000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.004938,
+      "peak_mem_bytes": 1329207,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_brute_n200",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 200,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.018143,
+      "peak_mem_bytes": 8113693,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_brute_n500",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.075816,
+      "peak_mem_bytes": 32221263,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_brute_n1000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.342352,
+      "peak_mem_bytes": 128436495,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_brute_n2000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 2.627762,
+      "peak_mem_bytes": 801078959,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_brute_n5000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 5.679893,
+      "peak_mem_bytes": 1569515933,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_euclidean",
+        "name": "kruskal_brute_n7000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 7000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.019723,
+      "peak_mem_bytes": 391242,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n200",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 200,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.009025,
+      "peak_mem_bytes": 391210,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n200",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 200,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.043711,
+      "peak_mem_bytes": 698590,
+      "n_clusters": 10,
+      "n_noise": 38,
+      "noise_fraction": 0.076,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n500",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.020951,
+      "peak_mem_bytes": 712092,
+      "n_clusters": 10,
+      "n_noise": 27,
+      "noise_fraction": 0.054,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n500",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.08294,
+      "peak_mem_bytes": 1247118,
+      "n_clusters": 10,
+      "n_noise": 96,
+      "noise_fraction": 0.096,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n1000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.040249,
+      "peak_mem_bytes": 1293174,
+      "n_clusters": 10,
+      "n_noise": 80,
+      "noise_fraction": 0.08,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n1000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.160405,
+      "peak_mem_bytes": 2328344,
+      "n_clusters": 10,
+      "n_noise": 248,
+      "noise_fraction": 0.124,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n2000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.070524,
+      "peak_mem_bytes": 2310568,
+      "n_clusters": 10,
+      "n_noise": 228,
+      "noise_fraction": 0.114,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n2000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.404884,
+      "peak_mem_bytes": 5353458,
+      "n_clusters": 11,
+      "n_noise": 762,
+      "noise_fraction": 0.1524,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n5000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.172119,
+      "peak_mem_bytes": 5360124,
+      "n_clusters": 10,
+      "n_noise": 760,
+      "noise_fraction": 0.152,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n5000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.799065,
+      "peak_mem_bytes": 10604654,
+      "n_clusters": 12,
+      "n_noise": 1457,
+      "noise_fraction": 0.1457,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n10000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.337855,
+      "peak_mem_bytes": 10645660,
+      "n_clusters": 10,
+      "n_noise": 1515,
+      "noise_fraction": 0.1515,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n10000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 2.046572,
+      "peak_mem_bytes": 26179472,
+      "n_clusters": 15,
+      "n_noise": 3679,
+      "noise_fraction": 0.1472,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n25000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 25000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.862146,
+      "peak_mem_bytes": 26121902,
+      "n_clusters": 10,
+      "n_noise": 3765,
+      "noise_fraction": 0.1506,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n25000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 25000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 4.097666,
+      "peak_mem_bytes": 52154672,
+      "n_clusters": 14,
+      "n_noise": 7115,
+      "noise_fraction": 0.1423,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n50000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 1.74717,
+      "peak_mem_bytes": 53011354,
+      "n_clusters": 10,
+      "n_noise": 6978,
+      "noise_fraction": 0.1396,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n50000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 7.157555,
+      "peak_mem_bytes": 106123658,
+      "n_clusters": 22,
+      "n_noise": 13370,
+      "noise_fraction": 0.1337,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "boruvka_precomp_n100000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 3.686878,
+      "peak_mem_bytes": 105806922,
+      "n_clusters": 10,
+      "n_noise": 13446,
+      "noise_fraction": 0.1345,
+      "config": {
+        "group": "scaling_precomputed",
+        "name": "kruskal_precomp_n100000",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.146354,
+      "peak_mem_bytes": 3898226,
+      "n_clusters": 2,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "boruvka_d2",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.088752,
+      "peak_mem_bytes": 20424792,
+      "n_clusters": 2,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "kruskal_knn_20_d2",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.078683,
+      "peak_mem_bytes": 3904519,
+      "n_clusters": 5,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "boruvka_d5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 5,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.093517,
+      "peak_mem_bytes": 20677056,
+      "n_clusters": 5,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "kruskal_knn_20_d5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 5,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.203768,
+      "peak_mem_bytes": 3912409,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "boruvka_d10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.097797,
+      "peak_mem_bytes": 21097450,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "kruskal_knn_20_d10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.523051,
+      "peak_mem_bytes": 6282448,
+      "n_clusters": 25,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "boruvka_d25",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 25,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.126394,
+      "peak_mem_bytes": 22358770,
+      "n_clusters": 25,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "kruskal_knn_20_d25",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 25,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 1.237258,
+      "peak_mem_bytes": 10384648,
+      "n_clusters": 50,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "boruvka_d50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 50,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.102083,
+      "peak_mem_bytes": 24460970,
+      "n_clusters": 50,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "kruskal_knn_20_d50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 50,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 3.009057,
+      "peak_mem_bytes": 18589002,
+      "n_clusters": 100,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "boruvka_d100",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 100,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.130021,
+      "peak_mem_bytes": 28665370,
+      "n_clusters": 100,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "kruskal_knn_20_d100",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 100,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 10.176852,
+      "peak_mem_bytes": 34997848,
+      "n_clusters": 200,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "boruvka_d200",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 200,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.220925,
+      "peak_mem_bytes": 37074124,
+      "n_clusters": 200,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "dimensionality",
+        "name": "kruskal_knn_20_d200",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 200,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.079602,
+      "peak_mem_bytes": 3935527,
+      "n_clusters": 3,
+      "n_noise": 1,
+      "noise_fraction": 0.0001,
+      "config": {
+        "group": "data_shapes",
+        "name": "boruvka_blobs",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.087243,
+      "peak_mem_bytes": 20424696,
+      "n_clusters": 3,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "data_shapes",
+        "name": "kruskal_knn_20_blobs",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.087467,
+      "peak_mem_bytes": 3895679,
+      "n_clusters": 2,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "data_shapes",
+        "name": "boruvka_moons",
+        "kind": "hdbscan",
+        "data_gen": "moons",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.083758,
+      "peak_mem_bytes": 20424743,
+      "n_clusters": 2,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "data_shapes",
+        "name": "kruskal_knn_20_moons",
+        "kind": "hdbscan",
+        "data_gen": "moons",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.075175,
+      "peak_mem_bytes": 3896509,
+      "n_clusters": 2,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "data_shapes",
+        "name": "boruvka_circles",
+        "kind": "hdbscan",
+        "data_gen": "circles",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.080589,
+      "peak_mem_bytes": 20424696,
+      "n_clusters": 2,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "data_shapes",
+        "name": "kruskal_knn_20_circles",
+        "kind": "hdbscan",
+        "data_gen": "circles",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.117018,
+      "peak_mem_bytes": 3943383,
+      "n_clusters": 292,
+      "n_noise": 8096,
+      "noise_fraction": 0.4048,
+      "config": {
+        "group": "data_shapes",
+        "name": "boruvka_uniform",
+        "kind": "hdbscan",
+        "data_gen": "uniform",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.085659,
+      "peak_mem_bytes": 20424743,
+      "n_clusters": 327,
+      "n_noise": 8214,
+      "noise_fraction": 0.4107,
+      "config": {
+        "group": "data_shapes",
+        "name": "kruskal_knn_20_uniform",
+        "kind": "hdbscan",
+        "data_gen": "uniform",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.072644,
+      "peak_mem_bytes": 3944009,
+      "n_clusters": 3,
+      "n_noise": 1213,
+      "noise_fraction": 0.0607,
+      "config": {
+        "group": "data_shapes",
+        "name": "boruvka_single_cluster",
+        "kind": "hdbscan",
+        "data_gen": "single_cluster",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.086166,
+      "peak_mem_bytes": 20424746,
+      "n_clusters": 2,
+      "n_noise": 382,
+      "noise_fraction": 0.0191,
+      "config": {
+        "group": "data_shapes",
+        "name": "kruskal_knn_20_single_cluster",
+        "kind": "hdbscan",
+        "data_gen": "single_cluster",
+        "n_samples": 20000,
+        "n_features": 2,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.315276,
+      "peak_mem_bytes": 3580239,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "boruvka_ms1",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 1,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.115575,
+      "peak_mem_bytes": 21097400,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "kruskal_knn_20_ms1",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 1,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.177352,
+      "peak_mem_bytes": 3728085,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "boruvka_ms3",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 3,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.099608,
+      "peak_mem_bytes": 21097400,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "kruskal_knn_20_ms3",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 3,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.151765,
+      "peak_mem_bytes": 3912205,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "boruvka_ms5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.109702,
+      "peak_mem_bytes": 21097496,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "kruskal_knn_20_ms5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.170201,
+      "peak_mem_bytes": 4621078,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "boruvka_ms10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 10,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.095548,
+      "peak_mem_bytes": 21097446,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "kruskal_knn_20_ms10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 10,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.1597,
+      "peak_mem_bytes": 6221078,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "boruvka_ms20",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 20,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.087033,
+      "peak_mem_bytes": 21097450,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "kruskal_knn_20_ms20",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 20,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.171802,
+      "peak_mem_bytes": 11021128,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "boruvka_ms50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 50,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.15011,
+      "peak_mem_bytes": 50497496,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_samples_sweep",
+        "name": "kruskal_knn_20_ms50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 50,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.046531,
+      "peak_mem_bytes": 6734732,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 4262.729060999511,
+      "mst_max_weight": 0.41844239537606864,
+      "core_dist_mean": 0.2130858797799758,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_knn_k5",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 5
+      }
+    },
+    {
+      "elapsed_sec": 0.058356,
+      "peak_mem_bytes": 11295630,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 3767.741530541546,
+      "mst_max_weight": 0.4056185436469675,
+      "core_dist_mean": 0.18835278759461557,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_knn_k10",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 10
+      }
+    },
+    {
+      "elapsed_sec": 0.077671,
+      "peak_mem_bytes": 16195630,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 3747.0650450119356,
+      "mst_max_weight": 0.3814375181715347,
+      "core_dist_mean": 0.18731410556665742,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_knn_k15",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 15
+      }
+    },
+    {
+      "elapsed_sec": 0.086842,
+      "peak_mem_bytes": 21095580,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 3840.3899418343917,
+      "mst_max_weight": 0.41979204876726933,
+      "core_dist_mean": 0.19198646427605678,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_knn_k20",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.114656,
+      "peak_mem_bytes": 30895580,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 3604.931601223828,
+      "mst_max_weight": 0.37287493433170077,
+      "core_dist_mean": 0.18022046380216658,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_knn_k30",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 30
+      }
+    },
+    {
+      "elapsed_sec": 0.161638,
+      "peak_mem_bytes": 50495580,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 3720.6234285297774,
+      "mst_max_weight": 0.36652141379812364,
+      "core_dist_mean": 0.18599275117625397,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_knn_k50",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 50
+      }
+    },
+    {
+      "elapsed_sec": 0.303099,
+      "peak_mem_bytes": 99495630,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 3825.6540676078157,
+      "mst_max_weight": 0.3844578862956451,
+      "core_dist_mean": 0.1912527993457303,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_knn_k100",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 100
+      }
+    },
+    {
+      "elapsed_sec": 0.169333,
+      "peak_mem_bytes": 3819102,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 4075.086370847898,
+      "mst_max_weight": 3.2385783870198463,
+      "core_dist_mean": 0.20246267318725586,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "boruvka_baseline",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 2.461313,
+      "peak_mem_bytes": 801077411,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1142.4986758958275,
+      "mst_max_weight": 3.657800057532775,
+      "core_dist_mean": 0.22309104612119854,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "config": {
+        "group": "knn_k_sweep",
+        "name": "kruskal_brute_baseline",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 1.364913,
+      "peak_mem_bytes": 5214090,
+      "n_clusters": 182,
+      "n_noise": 11368,
+      "noise_fraction": 0.5684,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "boruvka_kgraph5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 5
+      }
+    },
+    {
+      "elapsed_sec": 0.522476,
+      "peak_mem_bytes": 5123594,
+      "n_clusters": 107,
+      "n_noise": 15932,
+      "noise_fraction": 0.7966,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "kruskal_kgraph5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 5
+      }
+    },
+    {
+      "elapsed_sec": 1.559908,
+      "peak_mem_bytes": 10443870,
+      "n_clusters": 18,
+      "n_noise": 8133,
+      "noise_fraction": 0.4067,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "boruvka_kgraph10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 10
+      }
+    },
+    {
+      "elapsed_sec": 0.638197,
+      "peak_mem_bytes": 10370544,
+      "n_clusters": 10,
+      "n_noise": 8373,
+      "noise_fraction": 0.4187,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "kruskal_kgraph10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 10
+      }
+    },
+    {
+      "elapsed_sec": 1.627723,
+      "peak_mem_bytes": 15732432,
+      "n_clusters": 12,
+      "n_noise": 4760,
+      "noise_fraction": 0.238,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "boruvka_kgraph15",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 15
+      }
+    },
+    {
+      "elapsed_sec": 0.675371,
+      "peak_mem_bytes": 15632644,
+      "n_clusters": 10,
+      "n_noise": 4722,
+      "noise_fraction": 0.2361,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "kruskal_kgraph15",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 15
+      }
+    },
+    {
+      "elapsed_sec": 1.654891,
+      "peak_mem_bytes": 21292078,
+      "n_clusters": 13,
+      "n_noise": 2830,
+      "noise_fraction": 0.1415,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "boruvka_kgraph20",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.695002,
+      "peak_mem_bytes": 21152294,
+      "n_clusters": 10,
+      "n_noise": 2912,
+      "noise_fraction": 0.1456,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "kruskal_kgraph20",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 20
+      }
+    },
+    {
+      "elapsed_sec": 1.655821,
+      "peak_mem_bytes": 31926166,
+      "n_clusters": 13,
+      "n_noise": 1369,
+      "noise_fraction": 0.0684,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "boruvka_kgraph30",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 30
+      }
+    },
+    {
+      "elapsed_sec": 0.737465,
+      "peak_mem_bytes": 31390462,
+      "n_clusters": 10,
+      "n_noise": 1526,
+      "noise_fraction": 0.0763,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "kruskal_kgraph30",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 30
+      }
+    },
+    {
+      "elapsed_sec": 1.762285,
+      "peak_mem_bytes": 53538348,
+      "n_clusters": 10,
+      "n_noise": 572,
+      "noise_fraction": 0.0286,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "boruvka_kgraph50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 50
+      }
+    },
+    {
+      "elapsed_sec": 0.82629,
+      "peak_mem_bytes": 53613896,
+      "n_clusters": 10,
+      "n_noise": 574,
+      "noise_fraction": 0.0287,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "kruskal_kgraph50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 50
+      }
+    },
+    {
+      "elapsed_sec": 1.967684,
+      "peak_mem_bytes": 111800198,
+      "n_clusters": 10,
+      "n_noise": 78,
+      "noise_fraction": 0.0039,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "boruvka_kgraph100",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 100
+      }
+    },
+    {
+      "elapsed_sec": 1.011576,
+      "peak_mem_bytes": 110479926,
+      "n_clusters": 10,
+      "n_noise": 134,
+      "noise_fraction": 0.0067,
+      "config": {
+        "group": "sparsity_sweep",
+        "name": "kruskal_kgraph100",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "k_graph": 100
+      }
+    },
+    {
+      "elapsed_sec": 0.13093,
+      "peak_mem_bytes": 3912162,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "boruvka_mcs3",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 3,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.100012,
+      "peak_mem_bytes": 21097496,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "kruskal_knn_20_mcs3",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 3,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.160455,
+      "peak_mem_bytes": 3912175,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "boruvka_mcs5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.103814,
+      "peak_mem_bytes": 21097450,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "kruskal_knn_20_mcs5",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.191141,
+      "peak_mem_bytes": 3912306,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "boruvka_mcs10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 10,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.101297,
+      "peak_mem_bytes": 21097450,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "kruskal_knn_20_mcs10",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 10,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.133525,
+      "peak_mem_bytes": 3912442,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "boruvka_mcs15",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.102376,
+      "peak_mem_bytes": 21097496,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "kruskal_knn_20_mcs15",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 15,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.160136,
+      "peak_mem_bytes": 3912549,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "boruvka_mcs25",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 25,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.097877,
+      "peak_mem_bytes": 21097496,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "kruskal_knn_20_mcs25",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 25,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.142712,
+      "peak_mem_bytes": 3913239,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "boruvka_mcs50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 50,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.098417,
+      "peak_mem_bytes": 21097450,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "kruskal_knn_20_mcs50",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 50,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.185972,
+      "peak_mem_bytes": 3914207,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "boruvka_mcs100",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 100,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.103585,
+      "peak_mem_bytes": 21097496,
+      "n_clusters": 10,
+      "n_noise": 0,
+      "noise_fraction": 0.0,
+      "config": {
+        "group": "min_cluster_size_sweep",
+        "name": "kruskal_knn_20_mcs100",
+        "kind": "hdbscan",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "min_cluster_size": 100,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.001978,
+      "peak_mem_bytes": 99086,
+      "mst_n_edges": 499,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 171.8964217295121,
+      "mst_max_weight": 3.7796794057052128,
+      "core_dist_mean": 0.2883278727531433,
+      "neighbors_shape": [
+        500,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n500",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.001652,
+      "peak_mem_bytes": 531534,
+      "mst_n_edges": 499,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 153.10533592737085,
+      "mst_max_weight": 0.4983859684294253,
+      "core_dist_mean": 0.31053845994602114,
+      "neighbors_shape": [
+        500,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n500",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.004002,
+      "peak_mem_bytes": 194780,
+      "mst_n_edges": 999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 313.6712732807034,
+      "mst_max_weight": 4.009046814376615,
+      "core_dist_mean": 0.28850844502449036,
+      "neighbors_shape": [
+        1000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n1000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.002803,
+      "peak_mem_bytes": 1059100,
+      "mst_n_edges": 999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 257.6055113966902,
+      "mst_max_weight": 0.4394168754037937,
+      "core_dist_mean": 0.2593615877504973,
+      "neighbors_shape": [
+        1000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n1000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.007471,
+      "peak_mem_bytes": 386268,
+      "mst_n_edges": 1999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 526.2105865792154,
+      "mst_max_weight": 3.65011825892507,
+      "core_dist_mean": 0.24990352988243103,
+      "neighbors_shape": [
+        2000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n2000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.005955,
+      "peak_mem_bytes": 2114332,
+      "mst_n_edges": 1999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 494.934479895498,
+      "mst_max_weight": 0.42446131366404766,
+      "core_dist_mean": 0.2481977537928667,
+      "neighbors_shape": [
+        2000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n2000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.023319,
+      "peak_mem_bytes": 957196,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1099.3819450076144,
+      "mst_max_weight": 3.5858307201302986,
+      "core_dist_mean": 0.21447528898715973,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n5000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.016774,
+      "peak_mem_bytes": 5276846,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 1228.3805263059248,
+      "mst_max_weight": 0.5089254361249675,
+      "core_dist_mean": 0.24584675589714733,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n5000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.069644,
+      "peak_mem_bytes": 1911246,
+      "mst_n_edges": 9999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 2219.3264735071757,
+      "mst_max_weight": 3.3926371567618907,
+      "core_dist_mean": 0.21919579803943634,
+      "neighbors_shape": [
+        10000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n10000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.037039,
+      "peak_mem_bytes": 10549774,
+      "mst_n_edges": 9999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 2168.3304743251497,
+      "mst_max_weight": 0.4005109652662364,
+      "core_dist_mean": 0.21686855973892094,
+      "neighbors_shape": [
+        10000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n10000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.218376,
+      "peak_mem_bytes": 4814958,
+      "mst_n_edges": 24999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 4952.062313351975,
+      "mst_max_weight": 3.784749453074323,
+      "core_dist_mean": 0.19699200987815857,
+      "neighbors_shape": [
+        25000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n25000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 25000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.138519,
+      "peak_mem_bytes": 26407342,
+      "mst_n_edges": 24999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 4814.1674402180915,
+      "mst_max_weight": 0.38779586525774107,
+      "core_dist_mean": 0.19252149066453708,
+      "neighbors_shape": [
+        25000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n25000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 25000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.655342,
+      "peak_mem_bytes": 9626574,
+      "mst_n_edges": 49999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 8837.379471749555,
+      "mst_max_weight": 4.234816412070931,
+      "core_dist_mean": 0.1761847287416458,
+      "neighbors_shape": [
+        50000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n50000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 0.380164,
+      "peak_mem_bytes": 52810766,
+      "mst_n_edges": 49999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 8410.305592495733,
+      "mst_max_weight": 0.37375627343389234,
+      "core_dist_mean": 0.16815170011325775,
+      "neighbors_shape": [
+        50000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n50000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 1.477483,
+      "peak_mem_bytes": 19249758,
+      "mst_n_edges": 99999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 17182.405668108848,
+      "mst_max_weight": 3.8525384436390504,
+      "core_dist_mean": 0.1715060919523239,
+      "neighbors_shape": [
+        100000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "boruvka_n100000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null
+      }
+    },
+    {
+      "elapsed_sec": 1.030656,
+      "peak_mem_bytes": 105617614,
+      "mst_n_edges": 99999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 19235.837650644957,
+      "mst_max_weight": 0.4347162237488149,
+      "core_dist_mean": 0.192285110982175,
+      "neighbors_shape": [
+        100000,
+        5
+      ],
+      "config": {
+        "group": "mst_only",
+        "name": "kruskal_knn_20_n100000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20
+      }
+    },
+    {
+      "elapsed_sec": 0.001521,
+      "peak_mem_bytes": 99086,
+      "mst_n_edges": 499,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 177.61272234762106,
+      "mst_max_weight": 3.7592683061916468,
+      "core_dist_mean": 0.30489298701286316,
+      "neighbors_shape": [
+        500,
+        5
+      ],
+      "all_timings_sec": [
+        0.001615,
+        0.001447,
+        0.001521
+      ],
+      "timing_std_sec": 6.9e-05,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n500",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.00167,
+      "peak_mem_bytes": 531534,
+      "mst_n_edges": 499,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 153.12153487046956,
+      "mst_max_weight": 0.4710153359459556,
+      "core_dist_mean": 0.3106984202556239,
+      "neighbors_shape": [
+        500,
+        5
+      ],
+      "all_timings_sec": [
+        0.002466,
+        0.001647,
+        0.00167
+      ],
+      "timing_std_sec": 0.000381,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n500",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.002667,
+      "peak_mem_bytes": 194830,
+      "mst_n_edges": 999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 294.9924399990234,
+      "mst_max_weight": 4.225492839171157,
+      "core_dist_mean": 0.26769036054611206,
+      "neighbors_shape": [
+        1000,
+        5
+      ],
+      "all_timings_sec": [
+        0.002667,
+        0.002629,
+        0.002697
+      ],
+      "timing_std_sec": 2.8e-05,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n1000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.003516,
+      "peak_mem_bytes": 1059118,
+      "mst_n_edges": 999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 282.30954242832263,
+      "mst_max_weight": 0.4472779351418566,
+      "core_dist_mean": 0.28409266290392743,
+      "neighbors_shape": [
+        1000,
+        5
+      ],
+      "all_timings_sec": [
+        0.003717,
+        0.003516,
+        0.002886
+      ],
+      "timing_std_sec": 0.000354,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n1000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.012846,
+      "peak_mem_bytes": 386318,
+      "mst_n_edges": 1999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 523.0461721294889,
+      "mst_max_weight": 3.6404674315838017,
+      "core_dist_mean": 0.24728451669216156,
+      "neighbors_shape": [
+        2000,
+        5
+      ],
+      "all_timings_sec": [
+        0.01867,
+        0.010335,
+        0.012846
+      ],
+      "timing_std_sec": 0.003491,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n2000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.007804,
+      "peak_mem_bytes": 2114334,
+      "mst_n_edges": 1999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 558.2627831733907,
+      "mst_max_weight": 0.47114138955412993,
+      "core_dist_mean": 0.27987245538398736,
+      "neighbors_shape": [
+        2000,
+        5
+      ],
+      "all_timings_sec": [
+        0.007712,
+        0.008197,
+        0.007804
+      ],
+      "timing_std_sec": 0.00021,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n2000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.026735,
+      "peak_mem_bytes": 957294,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1091.5798266910033,
+      "mst_max_weight": 3.8641272564500935,
+      "core_dist_mean": 0.21267001330852509,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "all_timings_sec": [
+        0.033859,
+        0.025528,
+        0.026735
+      ],
+      "timing_std_sec": 0.003676,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n5000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.022926,
+      "peak_mem_bytes": 5276814,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 1339.7105316529928,
+      "mst_max_weight": 0.5270027188207429,
+      "core_dist_mean": 0.26809031972317326,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "all_timings_sec": [
+        0.029658,
+        0.022926,
+        0.018427
+      ],
+      "timing_std_sec": 0.004615,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n5000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.088627,
+      "peak_mem_bytes": 1911246,
+      "mst_n_edges": 9999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 2051.055394811177,
+      "mst_max_weight": 3.7511362261807717,
+      "core_dist_mean": 0.2024177759885788,
+      "neighbors_shape": [
+        10000,
+        5
+      ],
+      "all_timings_sec": [
+        0.093569,
+        0.088627,
+        0.083236
+      ],
+      "timing_std_sec": 0.00422,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n10000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.042816,
+      "peak_mem_bytes": 10549774,
+      "mst_n_edges": 9999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 2305.921837893698,
+      "mst_max_weight": 0.4376828458713692,
+      "core_dist_mean": 0.2306299355658024,
+      "neighbors_shape": [
+        10000,
+        5
+      ],
+      "all_timings_sec": [
+        0.041794,
+        0.042816,
+        0.044166
+      ],
+      "timing_std_sec": 0.000971,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n10000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.190141,
+      "peak_mem_bytes": 3819102,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 4113.276380879355,
+      "mst_max_weight": 3.5167984424025303,
+      "core_dist_mean": 0.2044455111026764,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "all_timings_sec": [
+        0.167331,
+        0.270982,
+        0.190141
+      ],
+      "timing_std_sec": 0.044471,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n20000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.09339,
+      "peak_mem_bytes": 21095550,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 3686.7389441977048,
+      "mst_max_weight": 0.4163167159424406,
+      "core_dist_mean": 0.18431600077577345,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "all_timings_sec": [
+        0.100779,
+        0.09339,
+        0.089565
+      ],
+      "timing_std_sec": 0.004654,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n20000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.627923,
+      "peak_mem_bytes": 9626574,
+      "mst_n_edges": 49999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 8398.562980910785,
+      "mst_max_weight": 3.6859484495717503,
+      "core_dist_mean": 0.1673538237810135,
+      "neighbors_shape": [
+        50000,
+        5
+      ],
+      "all_timings_sec": [
+        0.606613,
+        0.627923,
+        0.662759
+      ],
+      "timing_std_sec": 0.023142,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n50000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.354312,
+      "peak_mem_bytes": 52810734,
+      "mst_n_edges": 49999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 9121.116158663823,
+      "mst_max_weight": 0.3966705937284664,
+      "core_dist_mean": 0.18236285297632548,
+      "neighbors_shape": [
+        50000,
+        5
+      ],
+      "all_timings_sec": [
+        0.380594,
+        0.33565,
+        0.354312
+      ],
+      "timing_std_sec": 0.018436,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n50000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 1.349513,
+      "peak_mem_bytes": 19249806,
+      "mst_n_edges": 99999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 16701.68433753108,
+      "mst_max_weight": 3.15559969708488,
+      "core_dist_mean": 0.16671249270439148,
+      "neighbors_shape": [
+        100000,
+        5
+      ],
+      "all_timings_sec": [
+        1.483951,
+        1.260381,
+        1.349513
+      ],
+      "timing_std_sec": 0.091895,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n100000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.84408,
+      "peak_mem_bytes": 105617566,
+      "mst_n_edges": 99999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 16961.06400797535,
+      "mst_max_weight": 0.48967874050522003,
+      "core_dist_mean": 0.16954354187771878,
+      "neighbors_shape": [
+        100000,
+        5
+      ],
+      "all_timings_sec": [
+        0.885785,
+        0.84408,
+        0.827953
+      ],
+      "timing_std_sec": 0.024367,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n100000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 3.86815,
+      "peak_mem_bytes": 38496270,
+      "mst_n_edges": 199999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 31878.243542071312,
+      "mst_max_weight": 3.1971661477060582,
+      "core_dist_mean": 0.15920355916023254,
+      "neighbors_shape": [
+        200000,
+        5
+      ],
+      "all_timings_sec": [
+        3.86815,
+        3.766225,
+        3.899584
+      ],
+      "timing_std_sec": 0.056922,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "boruvka_n200000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 200000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 3.194968,
+      "peak_mem_bytes": 211231262,
+      "mst_n_edges": 199999,
+      "mst_n_inf_edges": 9,
+      "mst_total_weight": 29099.811427137203,
+      "mst_max_weight": 0.3653986352381408,
+      "core_dist_mean": 0.1454395299881046,
+      "neighbors_shape": [
+        200000,
+        5
+      ],
+      "all_timings_sec": [
+        3.235527,
+        3.194968,
+        3.06048
+      ],
+      "timing_std_sec": 0.074814,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_knn_20_n200000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 200000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.017665,
+      "peak_mem_bytes": 8112099,
+      "mst_n_edges": 499,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 175.29270374174456,
+      "mst_max_weight": 4.397587056855696,
+      "core_dist_mean": 0.2972803494574831,
+      "neighbors_shape": [
+        500,
+        5
+      ],
+      "all_timings_sec": [
+        0.017665,
+        0.017158,
+        0.017862
+      ],
+      "timing_std_sec": 0.000297,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_brute_n500",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.072587,
+      "peak_mem_bytes": 32219715,
+      "mst_n_edges": 999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 303.4195606699695,
+      "mst_max_weight": 4.371437800159018,
+      "core_dist_mean": 0.27707335467310473,
+      "neighbors_shape": [
+        1000,
+        5
+      ],
+      "all_timings_sec": [
+        0.072842,
+        0.072587,
+        0.070893
+      ],
+      "timing_std_sec": 0.000865,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_brute_n1000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.323338,
+      "peak_mem_bytes": 128434947,
+      "mst_n_edges": 1999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 527.072927075826,
+      "mst_max_weight": 3.79943250926845,
+      "core_dist_mean": 0.2506427275250952,
+      "neighbors_shape": [
+        2000,
+        5
+      ],
+      "all_timings_sec": [
+        0.323338,
+        0.318982,
+        0.329662
+      ],
+      "timing_std_sec": 0.004385,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_brute_n2000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.82612,
+      "peak_mem_bytes": 288653411,
+      "mst_n_edges": 2999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 670.2769095508314,
+      "mst_max_weight": 3.964724310493721,
+      "core_dist_mean": 0.21440144953700738,
+      "neighbors_shape": [
+        3000,
+        5
+      ],
+      "all_timings_sec": [
+        0.825676,
+        0.82612,
+        0.849641
+      ],
+      "timing_std_sec": 0.011194,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_brute_n3000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 3000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 2.431611,
+      "peak_mem_bytes": 801077411,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1143.3806347587515,
+      "mst_max_weight": 3.9974879663021325,
+      "core_dist_mean": 0.22321842497633523,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "all_timings_sec": [
+        2.492505,
+        2.431611,
+        2.420778
+      ],
+      "timing_std_sec": 0.031571,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_brute_n5000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 5.492178,
+      "peak_mem_bytes": 1569514339,
+      "mst_n_edges": 6999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1601.981620743651,
+      "mst_max_weight": 3.5917088631336225,
+      "core_dist_mean": 0.22545083393420282,
+      "neighbors_shape": [
+        7000,
+        5
+      ],
+      "all_timings_sec": [
+        7.280027,
+        5.492178,
+        5.223229
+      ],
+      "timing_std_sec": 0.912819,
+      "config": {
+        "group": "time_complexity_euclidean",
+        "name": "kruskal_brute_n7000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 7000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "euclidean",
+        "min_samples": 5,
+        "knn_k": null,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.042721,
+      "peak_mem_bytes": 700818,
+      "mst_n_edges": 499,
+      "mst_n_inf_edges": 36,
+      "mst_total_weight": 126.67669295323375,
+      "mst_max_weight": 0.41702096260826965,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        500,
+        5
+      ],
+      "all_timings_sec": [
+        0.043429,
+        0.042721,
+        0.03721
+      ],
+      "timing_std_sec": 0.00278,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n500",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.012695,
+      "peak_mem_bytes": 703646,
+      "mst_n_edges": 499,
+      "mst_n_inf_edges": 37,
+      "mst_total_weight": 136.5006203607121,
+      "mst_max_weight": 0.47257291376795785,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        500,
+        5
+      ],
+      "all_timings_sec": [
+        0.015761,
+        0.012695,
+        0.0126
+      ],
+      "timing_std_sec": 0.001468,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n500",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 500,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.069409,
+      "peak_mem_bytes": 1253248,
+      "mst_n_edges": 999,
+      "mst_n_inf_edges": 100,
+      "mst_total_weight": 258.90992026437664,
+      "mst_max_weight": 0.4423054065759305,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        1000,
+        5
+      ],
+      "all_timings_sec": [
+        0.069561,
+        0.064033,
+        0.069409
+      ],
+      "timing_std_sec": 0.002571,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n1000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.031102,
+      "peak_mem_bytes": 1235876,
+      "mst_n_edges": 999,
+      "mst_n_inf_edges": 105,
+      "mst_total_weight": 240.86515529326084,
+      "mst_max_weight": 0.4323966728328616,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        1000,
+        5
+      ],
+      "all_timings_sec": [
+        0.025629,
+        0.036803,
+        0.031102
+      ],
+      "timing_std_sec": 0.004562,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n1000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 1000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.149793,
+      "peak_mem_bytes": 2370834,
+      "mst_n_edges": 1999,
+      "mst_n_inf_edges": 239,
+      "mst_total_weight": 485.50562968804024,
+      "mst_max_weight": 0.4195612591614103,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        2000,
+        5
+      ],
+      "all_timings_sec": [
+        0.149793,
+        0.130779,
+        0.163322
+      ],
+      "timing_std_sec": 0.013349,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n2000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.068067,
+      "peak_mem_bytes": 2331646,
+      "mst_n_edges": 1999,
+      "mst_n_inf_edges": 261,
+      "mst_total_weight": 451.33597214090213,
+      "mst_max_weight": 0.4298250634220029,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        2000,
+        5
+      ],
+      "all_timings_sec": [
+        0.068067,
+        0.060024,
+        0.073557
+      ],
+      "timing_std_sec": 0.005558,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n2000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 2000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.41226,
+      "peak_mem_bytes": 5271718,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 782,
+      "mst_total_weight": 830.1732969840041,
+      "mst_max_weight": 0.3128166764959677,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "all_timings_sec": [
+        0.41226,
+        0.404569,
+        0.414434
+      ],
+      "timing_std_sec": 0.004232,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n5000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.164872,
+      "peak_mem_bytes": 5407058,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 699,
+      "mst_total_weight": 1038.8183721450168,
+      "mst_max_weight": 0.39255182612879375,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "all_timings_sec": [
+        0.141415,
+        0.164872,
+        0.165922
+      ],
+      "timing_std_sec": 0.011313,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n5000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.805726,
+      "peak_mem_bytes": 10681282,
+      "mst_n_edges": 9999,
+      "mst_n_inf_edges": 1544,
+      "mst_total_weight": 1635.2887147703786,
+      "mst_max_weight": 0.32505717508200943,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        10000,
+        5
+      ],
+      "all_timings_sec": [
+        0.805726,
+        0.770852,
+        0.82114
+      ],
+      "timing_std_sec": 0.021036,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n10000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.333345,
+      "peak_mem_bytes": 10764708,
+      "mst_n_edges": 9999,
+      "mst_n_inf_edges": 1424,
+      "mst_total_weight": 1998.353376487666,
+      "mst_max_weight": 0.4032649078368676,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        10000,
+        5
+      ],
+      "all_timings_sec": [
+        0.333345,
+        0.339153,
+        0.323046
+      ],
+      "timing_std_sec": 0.00666,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n10000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 10000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 1.627792,
+      "peak_mem_bytes": 21310126,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 2879,
+      "mst_total_weight": 3416.2189171573273,
+      "mst_max_weight": 0.3745142651885398,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "all_timings_sec": [
+        1.527871,
+        1.630297,
+        1.627792
+      ],
+      "timing_std_sec": 0.047705,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n20000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.673415,
+      "peak_mem_bytes": 20902086,
+      "mst_n_edges": 19999,
+      "mst_n_inf_edges": 3123,
+      "mst_total_weight": 3060.0943124712276,
+      "mst_max_weight": 0.3008764413585933,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        20000,
+        5
+      ],
+      "all_timings_sec": [
+        0.673415,
+        0.59703,
+        0.684529
+      ],
+      "timing_std_sec": 0.038893,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n20000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 20000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 4.030995,
+      "peak_mem_bytes": 52786194,
+      "mst_n_edges": 49999,
+      "mst_n_inf_edges": 7071,
+      "mst_total_weight": 7450.597112712459,
+      "mst_max_weight": 0.3141577500288823,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        50000,
+        5
+      ],
+      "all_timings_sec": [
+        4.167897,
+        3.49372,
+        4.030995
+      ],
+      "timing_std_sec": 0.29096,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n50000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 1.721256,
+      "peak_mem_bytes": 52201404,
+      "mst_n_edges": 49999,
+      "mst_n_inf_edges": 7082,
+      "mst_total_weight": 7541.829763955428,
+      "mst_max_weight": 0.33126197784288824,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        50000,
+        5
+      ],
+      "all_timings_sec": [
+        1.721256,
+        1.739348,
+        1.71917
+      ],
+      "timing_std_sec": 0.009061,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n50000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 50000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 8.062704,
+      "peak_mem_bytes": 106818810,
+      "mst_n_edges": 99999,
+      "mst_n_inf_edges": 13096,
+      "mst_total_weight": 14793.07184463842,
+      "mst_max_weight": 0.3291148514144602,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        100000,
+        5
+      ],
+      "all_timings_sec": [
+        8.303006,
+        8.062704,
+        7.024378
+      ],
+      "timing_std_sec": 0.554853,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "boruvka_n100000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 3.274264,
+      "peak_mem_bytes": 107088480,
+      "mst_n_edges": 99999,
+      "mst_n_inf_edges": 12998,
+      "mst_total_weight": 15127.16718313883,
+      "mst_max_weight": 0.3371203136769007,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        100000,
+        5
+      ],
+      "all_timings_sec": [
+        3.255994,
+        3.274264,
+        3.45775
+      ],
+      "timing_std_sec": 0.091108,
+      "config": {
+        "group": "time_complexity_precomputed",
+        "name": "kruskal_n100000",
+        "kind": "mst",
+        "data_gen": "blobs",
+        "n_samples": 100000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "k_graph": 20,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.300075,
+      "peak_mem_bytes": 1054555,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 4894,
+      "mst_total_weight": 568.9434482625553,
+      "mst_max_weight": 6.402844139112437,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 10000,
+      "graph_density": 0.0004,
+      "all_timings_sec": [
+        0.283362,
+        0.300075,
+        0.303104
+      ],
+      "timing_std_sec": 0.008681,
+      "config": {
+        "group": "precomputed_density",
+        "name": "boruvka_density0.0001",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.0001,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.119342,
+      "peak_mem_bytes": 1054555,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 4890,
+      "mst_total_weight": 597.2465615960525,
+      "mst_max_weight": 6.840012474816835,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 10000,
+      "graph_density": 0.0004,
+      "all_timings_sec": [
+        0.117165,
+        0.119342,
+        0.119834
+      ],
+      "timing_std_sec": 0.00116,
+      "config": {
+        "group": "precomputed_density",
+        "name": "kruskal_density0.0001",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.0001,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.404386,
+      "peak_mem_bytes": 2568150,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 2245,
+      "mst_total_weight": 13987.16482853977,
+      "mst_max_weight": 6.2272737254201544,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 24994,
+      "graph_density": 0.001,
+      "all_timings_sec": [
+        0.404438,
+        0.404386,
+        0.397532
+      ],
+      "timing_std_sec": 0.003243,
+      "config": {
+        "group": "precomputed_density",
+        "name": "boruvka_density0.001",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.001,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.159821,
+      "peak_mem_bytes": 2568150,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 2183,
+      "mst_total_weight": 14168.371398005362,
+      "mst_max_weight": 6.99092140620627,
+      "core_dist_mean": Infinity,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 24994,
+      "graph_density": 0.001,
+      "all_timings_sec": [
+        0.156042,
+        0.159821,
+        0.164304
+      ],
+      "timing_std_sec": 0.003377,
+      "config": {
+        "group": "precomputed_density",
+        "name": "kruskal_density0.001",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.001,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.469307,
+      "peak_mem_bytes": 25288706,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 8456.730496867822,
+      "mst_max_weight": 4.738259984681636,
+      "core_dist_mean": 1.6828650761567479,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 249950,
+      "graph_density": 0.009998,
+      "all_timings_sec": [
+        0.469307,
+        0.460737,
+        0.471795
+      ],
+      "timing_std_sec": 0.004736,
+      "config": {
+        "group": "precomputed_density",
+        "name": "boruvka_density0.01",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.01,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.238319,
+      "peak_mem_bytes": 25288706,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 9286.016904454198,
+      "mst_max_weight": 4.595844383565419,
+      "core_dist_mean": 1.8488833955404815,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 249950,
+      "graph_density": 0.009998,
+      "all_timings_sec": [
+        0.232857,
+        0.239849,
+        0.238319
+      ],
+      "timing_std_sec": 0.003001,
+      "config": {
+        "group": "precomputed_density",
+        "name": "kruskal_density0.01",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.01,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.951822,
+      "peak_mem_bytes": 252493256,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1802.9898208843326,
+      "mst_max_weight": 3.6017628394077317,
+      "core_dist_mean": 0.35568501531432284,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 2499500,
+      "graph_density": 0.09998,
+      "all_timings_sec": [
+        0.962608,
+        0.934911,
+        0.951822
+      ],
+      "timing_std_sec": 0.011399,
+      "config": {
+        "group": "precomputed_density",
+        "name": "boruvka_density0.1",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.1,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 0.927744,
+      "peak_mem_bytes": 252493256,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1505.642083497663,
+      "mst_max_weight": 3.981276745678533,
+      "core_dist_mean": 0.2955324420473556,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 2499500,
+      "graph_density": 0.09998,
+      "all_timings_sec": [
+        0.919176,
+        0.943281,
+        0.927744
+      ],
+      "timing_std_sec": 0.009977,
+      "config": {
+        "group": "precomputed_density",
+        "name": "kruskal_density0.1",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 0.1,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 6.362335,
+      "peak_mem_bytes": 2524538820,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1088.3636050307205,
+      "mst_max_weight": 3.9004478867570165,
+      "core_dist_mean": 0.21269565829869916,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 24995000,
+      "graph_density": 0.9998,
+      "all_timings_sec": [
+        6.503861,
+        6.202564,
+        6.362335
+      ],
+      "timing_std_sec": 0.123079,
+      "config": {
+        "group": "precomputed_density",
+        "name": "boruvka_density1.0",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "boruvka",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 1.0,
+        "n_repeats": 3
+      }
+    },
+    {
+      "elapsed_sec": 9.840465,
+      "peak_mem_bytes": 2524538820,
+      "mst_n_edges": 4999,
+      "mst_n_inf_edges": 0,
+      "mst_total_weight": 1216.6951303970054,
+      "mst_max_weight": 3.449365446245308,
+      "core_dist_mean": 0.238178319287168,
+      "neighbors_shape": [
+        5000,
+        5
+      ],
+      "graph_nnz": 24995000,
+      "graph_density": 0.9998,
+      "all_timings_sec": [
+        9.770676,
+        9.840465,
+        10.268438
+      ],
+      "timing_std_sec": 0.22005,
+      "config": {
+        "group": "precomputed_density",
+        "name": "kruskal_density1.0",
+        "kind": "mst_density",
+        "data_gen": "blobs",
+        "n_samples": 5000,
+        "n_features": 10,
+        "algorithm": "kruskal",
+        "metric": "precomputed",
+        "min_samples": 5,
+        "density": 1.0,
+        "n_repeats": 3
+      }
+    }
+  ]
+}

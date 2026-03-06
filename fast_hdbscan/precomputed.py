@@ -1,28 +1,30 @@
 """
 Sparse precomputed graph support
 
-These functions are intended to allow for hdbscan to be called with a 
-precomputed sparse graph (i.e., metric='precomputed' and X a scipy sparse 
-matrix). They handle conversion of a scipy sparse pairwise weight matrix into 
+These functions are intended to allow for hdbscan to be called with a
+precomputed sparse graph (i.e., metric='precomputed' and X a scipy sparse
+matrix). They handle conversion of a scipy sparse pairwise weight matrix into
 the CoreGraph CSR format expected by the Borůvka MST routine in core_graph.py.
 
 The contract:
-- Input graphs are expected to be square, pairwise distances/weights 
+- Input graphs are expected to be square, pairwise distances/weights
   (non-negative, finite).
 - Missing/sparse entries mean "no edge" (treated as +inf in MST).
-- Explicit stored 0.0 edges are valid and preserved (no .eliminate_zeros() 
+- Explicit stored 0.0 edges are valid and preserved (no .eliminate_zeros()
   calls).
 - Asymmetric weights are symmetrized by undirected min: w_ij = min(w_ij, w_ji).
-- Disconnected components (forest trunks) are bridged with deterministic +inf 
+- Disconnected components (forest trunks) are bridged with deterministic +inf
   edges.
 
-Rich Hakim 2026_02_28. Editing and formatting with Claude Code Opus 4.6 .
+Rich Hakim 2026_02_28. Editing , formatting, and jit help with Claude Code Opus 4.6 .
 """
 
 import numpy as np
 import scipy.sparse
+import numba
 
-from .core_graph import CoreGraph, minimum_spanning_tree
+from .core_graph import CoreGraph, boruvka_mst
+from .variables import NUMBA_CACHE
 
 
 def validate_precomputed_sparse_graph(X):
@@ -65,188 +67,242 @@ def validate_precomputed_sparse_graph(X):
             )
 
 
-def extract_undirected_min_edges(X):
+def _symmetrize_min_csr(X):
     """
-    Extract canonical undirected edges from a (possibly asymmetric) sparse matrix.
+    Convert any sparse matrix to a symmetric CSR by taking min weight per
+    undirected pair. Diagonal entries are dropped. Explicit zeros are preserved.
 
-    - Off-diagonal stored entries become undirected candidate edges.
-    - Pairs (i,j) and (j,i) are symmetrized by taking the minimum weight.
-    - Explicit stored 0.0 values are preserved (no eliminate_zeros() call).
+    Uses numpy vectorized operations (lexsort + minimum.reduceat) to avoid
+    Python-level loops over edges.
 
     Parameters
     ----------
-    X : scipy sparse matrix
+    X : scipy sparse matrix, shape (n, n)
 
     Returns
     -------
-    edges : list of (u, v, w) tuples
-        Canonical undirected edges with u < v, one per unordered pair.
+    X_sym : scipy.sparse.csr_matrix, shape (n, n), symmetric, float64 data.
+        Built via the (data, indices, indptr) CSR constructor to prevent
+        scipy from silently eliminating explicit stored zeros.
     """
     coo = X.tocoo()
     rows, cols, data = coo.row, coo.col, coo.data
+    n = X.shape[0]
 
-    # Use dict with canonical (u=min(i,j), v=max(i,j)) keys to accumulate min weight.
-    # We iterate raw data (not .nonzero()) to preserve explicit zeros.
-    edge_dict = {}
-    for i, j, w in zip(rows, cols, data):
-        if i == j:
-            continue  # skip self-loops/diagonal
-        u = int(min(i, j))
-        v = int(max(i, j))
-        key = (u, v)
-        w = float(w)
-        if key in edge_dict:
-            # Asymmetric resolution: keep minimum weight
-            if w < edge_dict[key]:
-                edge_dict[key] = w
-        else:
-            edge_dict[key] = w
+    # Remove self-loops
+    off_diag = rows != cols
+    rows, cols, data = rows[off_diag], cols[off_diag], data[off_diag]
 
-    return [(u, v, w) for (u, v), w in edge_dict.items()]
+    if len(data) == 0:
+        empty_indptr = np.zeros(n + 1, dtype=np.int32)
+        return scipy.sparse.csr_matrix(
+            (np.empty(0, dtype=np.float64), np.empty(0, dtype=np.int32), empty_indptr),
+            shape=(n, n),
+        )
+
+    # Canonicalize to upper triangle: u = min(i,j), v = max(i,j)
+    u = np.minimum(rows, cols)
+    v = np.maximum(rows, cols)
+
+    # Lexsort by (u, v) to group both orientations of each pair together
+    order = np.lexsort((v.astype(np.int64), u.astype(np.int64)))
+    u = u[order]
+    v = v[order]
+    data = data[order].astype(np.float64)
+
+    # Locate the first occurrence of each unique (u, v) pair
+    keys = u.astype(np.int64) * n + v.astype(np.int64)
+    group_starts = np.concatenate(([0], np.where(keys[1:] != keys[:-1])[0] + 1))
+
+    # Minimum weight per undirected pair
+    min_data = np.minimum.reduceat(data, group_starts)
+    u_out = u[group_starts].astype(np.int32)
+    v_out = v[group_starts].astype(np.int32)
+    m = len(u_out)
+
+    # Mirror each canonical edge in both directions
+    sym_rows = np.empty(2 * m, dtype=np.int32)
+    sym_rows[:m] = u_out
+    sym_rows[m:] = v_out
+    sym_cols = np.empty(2 * m, dtype=np.int32)
+    sym_cols[:m] = v_out
+    sym_cols[m:] = u_out
+    sym_data = np.concatenate([min_data, min_data])
+
+    # Sort by row so we can build CSR indptr directly
+    row_order = np.argsort(sym_rows, kind="stable")
+    sym_rows = sym_rows[row_order]
+    sym_cols = sym_cols[row_order]
+    sym_data = sym_data[row_order]
+
+    # Build CSR indptr without going through the COO->CSR path (which would
+    # call sum_duplicates/eliminate_zeros and drop explicit zeros)
+    counts = np.bincount(sym_rows, minlength=n).astype(np.int32)
+    indptr = np.zeros(n + 1, dtype=np.int32)
+    indptr[1:] = np.cumsum(counts)
+
+    return scipy.sparse.csr_matrix((sym_data, sym_cols, indptr), shape=(n, n))
 
 
-def build_adjacency_lists(n, undirected_edges):
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
+def _core_distances_csr(data, indices, indptr, min_samples):
     """
-    Build per-node adjacency lists from a list of undirected edges.
+    Compute per-node core distances from a symmetric CSR graph.
+
+    For each node i the core distance is the base distance to its
+    min_samples-th nearest neighbor. Nodes with fewer than min_samples
+    stored neighbors get core_distance = inf. Runs in parallel over nodes.
 
     Parameters
     ----------
-    n : int
-        Number of nodes.
-    undirected_edges : list of (u, v, w) tuples
-
-    Returns
-    -------
-    adjacency : list of lists, length n
-        adjacency[i] = list of (neighbor_idx, weight) pairs (both directions).
-    """
-    adjacency = [[] for _ in range(n)]
-    for u, v, w in undirected_edges:
-        adjacency[u].append((v, w))
-        adjacency[v].append((u, w))
-    return adjacency
-
-
-def compute_sparse_core_distances(adjacency, min_samples):
-    """
-    Compute core distances for nodes from adjacency lists.
-
-    - If min_samples <= 1: core_distance[i] = 0.0 for all i (fast path).
-    - Else: core_distance[i] = distance to the min_samples-th nearest neighbor.
-      Nodes with fewer than min_samples neighbors get core_distance = np.inf.
-
-    Also returns a neighbors array shaped (n, k) where k = max(1, min_samples),
-    filled with nearest-neighbor indices (padded with -1 when unavailable).
-
-    Parameters
-    ----------
-    adjacency : list of lists
-        Per-node (neighbor, weight) lists.
+    data : float64 array, CSR edge weights
+    indices : int32 array, CSR column indices
+    indptr : int32 array, CSR row pointers
     min_samples : int
 
     Returns
     -------
-    neighbors : np.ndarray, int32, shape (n, k)
-    core_distances : np.ndarray, float64, shape (n,)
+    neighbors : int32 array, shape (n, k) where k = max(1, min_samples)
+        Sorted nearest-neighbor indices; -1 where unavailable.
+    core_distances : float64 array, shape (n,)
     """
-    n = len(adjacency)
+    n = len(indptr) - 1
     k = max(1, min_samples)
     neighbors = np.full((n, k), -1, dtype=np.int32)
     core_distances = np.zeros(n, dtype=np.float64)
 
-    if min_samples <= 1:
-        # Core distance = 0; just populate top-k neighbors
-        for i, nbrs in enumerate(adjacency):
-            sorted_nbrs = sorted(nbrs, key=lambda x: x[1])
-            for j, (nb_idx, _) in enumerate(sorted_nbrs[:k]):
-                neighbors[i, j] = nb_idx
-        return neighbors, core_distances
+    for i in numba.prange(n):
+        start = indptr[i]
+        end = indptr[i + 1]
+        deg = end - start
 
-    for i, nbrs in enumerate(adjacency):
-        if len(nbrs) == 0:
-            core_distances[i] = np.inf
-        else:
-            sorted_nbrs = sorted(nbrs, key=lambda x: x[1])
-            for j, (nb_idx, _) in enumerate(sorted_nbrs[:k]):
-                neighbors[i, j] = nb_idx
-            if len(sorted_nbrs) >= min_samples:
-                core_distances[i] = sorted_nbrs[min_samples - 1][1]
+        if deg == 0:
+            if min_samples > 1:
+                core_distances[i] = np.inf
+            continue
+
+        row_data = data[start:end].copy()
+        row_indices = indices[start:end].copy()
+
+        order = np.argsort(row_data)
+
+        fill = min(k, deg)
+        for j in range(fill):
+            neighbors[i, j] = row_indices[order[j]]
+
+        if min_samples > 1:
+            if deg >= min_samples:
+                core_distances[i] = row_data[order[min_samples - 1]]
             else:
                 core_distances[i] = np.inf
 
     return neighbors, core_distances
 
 
-def apply_mutual_reachability(undirected_edges, core_distances):
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
+def _build_core_graph_csr(data, indices, indptr, core_distances):
     """
-    Convert base edge weights to mutual reachability distances (MRD).
+    Apply mutual reachability distances and build CoreGraph arrays.
 
-    MRD(i, j) = max(core_dist[i], core_dist[j], base_weight(i, j))
+    For each edge (i, j, w): MRD = max(core_dist[i], core_dist[j], w).
+    Weights are stored as float32 (required by Borůvka) and sorted ascending
+    within each row so that select_components picks the lightest outgoing edge.
+    Ties in MRD are broken by ascending neighbor index for determinism.
+    Runs in parallel over nodes.
 
     Parameters
     ----------
-    undirected_edges : list of (u, v, w) tuples
-    core_distances : np.ndarray, shape (n,)
+    data : float64 array, base edge weights (from symmetric CSR)
+    indices : int32 array, CSR column indices
+    indptr : int32 array, CSR row pointers
+    core_distances : float64 array, shape (n,)
 
     Returns
     -------
-    mrd_edges : list of (u, v, mrd) triples
+    weights : float32 array (MRD values, for Borůvka comparison)
+    distances : float32 array (same as weights in precomputed path)
+    new_indices : int32 array (column indices reordered by ascending MRD)
     """
-    mrd_edges = []
-    for u, v, w in undirected_edges:
-        mrd = max(float(core_distances[u]), float(core_distances[v]), w)
-        mrd_edges.append((u, v, mrd))
-    return mrd_edges
-
-
-def to_core_graph_arrays(n, mrd_edges):
-    """
-    Build a CoreGraph CSR structure from a list of MRD edges.
-
-    Each undirected edge (u, v, mrd) is stored in both directions.
-    Each row is sorted by (weight, neighbor_idx) for determinism — this ensures
-    Borůvka's select_components always picks the minimum-weight outgoing edge.
-
-    In the precomputed path, weights == distances (both are MRD values).
-
-    Parameters
-    ----------
-    n : int
-        Number of nodes.
-    mrd_edges : list of (u, v, mrd) triples
-
-    Returns
-    -------
-    CoreGraph namedtuple with arrays (weights, distances, indices, indptr).
-    """
-    # Build per-node sorted edge lists: (mrd, neighbor_idx)
-    adj = [[] for _ in range(n)]
-    for u, v, mrd in mrd_edges:
-        adj[u].append((mrd, v))
-        adj[v].append((mrd, u))
-
-    # Sort each row by (weight, neighbor_idx) for determinism
-    for i in range(n):
-        adj[i].sort()
-
-    # Build CSR indptr
-    indptr = np.zeros(n + 1, dtype=np.int32)
-    for i in range(n):
-        indptr[i + 1] = indptr[i] + len(adj[i])
-    nnz = int(indptr[-1])
+    n = len(indptr) - 1
+    nnz = len(data)
 
     weights = np.empty(nnz, dtype=np.float32)
     distances = np.empty(nnz, dtype=np.float32)
-    indices = np.full(nnz, -1, dtype=np.int32)
+    new_indices = np.empty(nnz, dtype=np.int32)
 
-    for i in range(n):
-        start = int(indptr[i])
-        for j, (w, nb) in enumerate(adj[i]):
-            weights[start + j] = w
-            distances[start + j] = w  # weight == distance in precomputed path
-            indices[start + j] = nb
+    for i in numba.prange(n):
+        start = indptr[i]
+        end = indptr[i + 1]
+        cd_i = core_distances[i]
+        deg = end - start
 
-    return CoreGraph(weights, distances, indices, indptr)
+        if deg == 0:
+            continue
+
+        # Compute MRD for each neighbor of node i
+        row_mrd = np.empty(deg, dtype=np.float32)
+        for p in range(deg):
+            nbr = indices[start + p]
+            mrd = max(cd_i, core_distances[nbr], data[start + p])
+            row_mrd[p] = np.float32(mrd)
+
+        # Sort by (MRD, neighbor_idx): sort by neighbor_idx first, then
+        # stable-sort by MRD so that ties preserve the neighbor-index order.
+        # This matches the old (mrd, v) tuple-sort behaviour for determinism.
+        row_nbr = indices[start:end].copy()
+        idx_order = np.argsort(row_nbr)
+        sorted_mrd = row_mrd[idx_order]
+        sorted_nbr = row_nbr[idx_order]
+
+        mrd_order = np.argsort(sorted_mrd, kind="mergesort")
+        for p in range(deg):
+            tgt = start + p
+            sp = mrd_order[p]
+            weights[tgt] = sorted_mrd[sp]
+            distances[tgt] = sorted_mrd[sp]
+            new_indices[tgt] = sorted_nbr[sp]
+
+    return weights, distances, new_indices
+
+
+@numba.njit(cache=NUMBA_CACHE)
+def _patch_mst_weights(mst_edges, sym_data, sym_indices, sym_indptr, core_distances):
+    """
+    Restore exact float64 MRD weights to Borůvka's float32-rounded MST edges.
+
+    Borůvka identifies correct MST topology even with float32 weights (~6e-5
+    relative error), but the stored weight values are rounded. This function
+    looks up the original base weight for each finite MST edge and recomputes
+    MRD exactly in float64, preserving precise lambda values for the condensed
+    tree — particularly important for cluster_selection_method='leaf'.
+
+    Bridge edges (weight > 1e200) are left unchanged.
+
+    Parameters
+    ----------
+    mst_edges : float64 array, shape (n-1, 3)
+    sym_data : float64 array, base edge weights from symmetric CSR
+    sym_indices : int32 array
+    sym_indptr : int32 array
+    core_distances : float64 array, shape (n,)
+
+    Returns
+    -------
+    patched_weights : float64 array, shape (n-1,)
+    """
+    patched = mst_edges[:, 2].copy()
+    for i in range(len(mst_edges)):
+        if mst_edges[i, 2] > 1e200:  # bridge edge — leave as inf
+            continue
+        src = np.int32(mst_edges[i, 0])
+        dst = np.int32(mst_edges[i, 1])
+        base_w = 0.0
+        for p in range(sym_indptr[src], sym_indptr[src + 1]):
+            if sym_indices[p] == dst:
+                base_w = sym_data[p]
+                break
+        patched[i] = max(core_distances[src], core_distances[dst], base_w)
+    return patched
 
 
 def bridge_forest_with_inf(edges, component_labels, n):
@@ -307,13 +363,21 @@ def compute_mst_from_precomputed_sparse(X, min_samples):
 
     Orchestrates the full precomputed pipeline:
     1. Validate input.
-    2. Extract undirected min-weight edges (preserving explicit zeros).
-    3. Build adjacency lists.
-    4. Compute core distances (and neighbor indices).
-    5. Apply mutual reachability distances.
-    6. Build CoreGraph CSR structure.
-    7. Run Borůvka MST.
-    8. Bridge any disconnected components with +inf edges.
+    2. Symmetrize by min weight, drop diagonal (vectorized numpy).
+    3. Compute core distances in parallel (Numba JIT).
+    4. Build CoreGraph with MRD weights in parallel (Numba JIT).
+    5. Run Borůvka MST (Numba JIT, float32 internally).
+    6. Bridge disconnected components with +inf edges.
+    7. Restore exact float64 MRD weights (Numba JIT).
+
+    Borůvka is used for its O(m log n) efficiency.  It operates on float32
+    weights internally (~6e-5 relative rounding), which does not change which
+    edges are selected (MST topology is correct) but does shift the stored
+    weight values.  After Borůvka, each MST edge weight is recomputed exactly
+    in float64 from the original base weights and core distances, so that
+    condensed-tree lambda = 1/weight is not degraded — this matters for
+    cluster_selection_method='leaf' where small lambda differences can shift
+    cluster boundaries.
 
     Parameters
     ----------
@@ -331,16 +395,86 @@ def compute_mst_from_precomputed_sparse(X, min_samples):
     validate_precomputed_sparse_graph(X)
     n = X.shape[0]
 
-    undirected_edges = extract_undirected_min_edges(X)
-    adjacency = build_adjacency_lists(n, undirected_edges)
-    neighbors, core_distances = compute_sparse_core_distances(adjacency, min_samples)
-    mrd_edges = apply_mutual_reachability(undirected_edges, core_distances)
-    core_graph = to_core_graph_arrays(n, mrd_edges)
+    # 1. Symmetrize: min weight per undirected pair, no diagonal, explicit zeros preserved.
+    X_sym = _symmetrize_min_csr(X)
 
-    # Borůvka MST; returns (n_components, component_labels, edges)
-    n_components, component_labels, mst_edges = minimum_spanning_tree(core_graph)
+    # _symmetrize_min_csr guarantees float64 data and int32 indices/indptr.
+    # 2. Core distances and nearest-neighbor indices (parallel over nodes).
+    neighbors, core_distances = _core_distances_csr(
+        X_sym.data, X_sym.indices, X_sym.indptr, min_samples
+    )
 
-    # Bridge any remaining disconnected components with +inf edges
+    # 3. Build CoreGraph with MRD weights, sorted per row (parallel over nodes).
+    weights, distances, cg_indices = _build_core_graph_csr(
+        X_sym.data, X_sym.indices, X_sym.indptr, core_distances
+    )
+    core_graph = CoreGraph(weights, distances, cg_indices, X_sym.indptr)
+
+    # 4. Borůvka MST (float32 internally — fast).
+    n_components, component_labels, mst_edges = boruvka_mst(core_graph)
+
+    # 5. Bridge disconnected components with +inf edges.
+    if n_components > 1:
+        mst_edges = bridge_forest_with_inf(mst_edges, component_labels, n)
+
+    # 6. Restore float64 precision: recompute MRD exactly for each MST edge.
+    mst_weights = _patch_mst_weights(
+        mst_edges, X_sym.data, X_sym.indices, X_sym.indptr, core_distances
+    )
+    mst_edges = np.column_stack([mst_edges[:, :2], mst_weights])
+
+    return mst_edges, neighbors, core_distances
+
+
+def compute_mst_from_precomputed_sparse_kruskal(X, min_samples):
+    """
+    Compute the MST from a scipy sparse precomputed pairwise weight matrix
+    using Kruskal's algorithm.
+
+    Compared to the Borůvka path, this function is simpler because Kruskal
+    operates directly on float64 MRD weights — no float32 CoreGraph
+    intermediate and no post-hoc weight-patching step are required.
+
+    Pipeline:
+    1. Validate input.
+    2. Symmetrize by min weight, drop diagonal (vectorized numpy).
+    3. Compute core distances in parallel (Numba JIT).
+    4. Compute float64 MRD for every stored edge (Numba JIT).
+    5. Global sort + Kruskal DSU (Numba JIT).
+    6. Bridge disconnected components with +inf edges.
+
+    Parameters
+    ----------
+    X : scipy sparse matrix, shape (n, n)
+        Pairwise distance/weight graph. Missing entries = no edge (+inf).
+    min_samples : int
+        Number of neighbors to use for core distance computation.
+
+    Returns
+    -------
+    edges : np.ndarray, shape (n-1, 3), columns [src, dst, mrd_weight]
+    neighbors : np.ndarray, int32, shape (n, k)
+    core_distances : np.ndarray, float64, shape (n,)
+    """
+    from .kruskal import kruskal_mst_from_csr
+
+    validate_precomputed_sparse_graph(X)
+    n = X.shape[0]
+
+    # 1. Symmetrize: min weight per undirected pair, no diagonal.
+    X_sym = _symmetrize_min_csr(X)
+
+    # 2. Core distances and nearest-neighbor indices (parallel over nodes).
+    neighbors, core_distances = _core_distances_csr(
+        X_sym.data, X_sym.indices, X_sym.indptr, min_samples
+    )
+
+    # 3. Kruskal MST (float64 throughout — no patching needed).
+    n_components, component_labels, mst_edges = kruskal_mst_from_csr(
+        X_sym.data, X_sym.indices, X_sym.indptr, core_distances
+    )
+
+    # 4. Bridge disconnected components with +inf edges.
     if n_components > 1:
         mst_edges = bridge_forest_with_inf(mst_edges, component_labels, n)
 
