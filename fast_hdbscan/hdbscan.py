@@ -157,6 +157,7 @@ def fast_hdbscan(
     metric="euclidean",
     algorithm="boruvka",
     knn_k=None,
+    metric_kwds=None,
 ):
     if metric == "precomputed":
         if sample_weights is not None:
@@ -167,9 +168,11 @@ def fast_hdbscan(
     elif metric == "euclidean":
         data = check_array(data)
     else:
-        raise ValueError(
-            "metric must be 'euclidean' or 'precomputed'. Got: %s" % metric
-        )
+        # Arbitrary metric — requires pynndescent
+        from .nndescent import _check_pynndescent_available
+
+        _check_pynndescent_available()
+        data = check_array(data)
 
     # Detect parameter inconsistencies early.
     if semi_supervised:
@@ -211,6 +214,7 @@ def fast_hdbscan(
         metric=metric,
         algorithm=algorithm,
         knn_k=knn_k,
+        metric_kwds=metric_kwds,
     )
 
     return (
@@ -240,6 +244,7 @@ def compute_minimum_spanning_tree(
     metric="euclidean",
     algorithm="boruvka",
     knn_k=None,
+    metric_kwds=None,
 ):
     """
     Compute the minimum spanning tree for HDBSCAN.
@@ -248,23 +253,28 @@ def compute_minimum_spanning_tree(
     ----------
     data : array-like or scipy sparse matrix
         Feature matrix (metric='euclidean') or pairwise weight graph
-        (metric='precomputed').
+        (metric='precomputed'). For arbitrary metrics, a dense feature matrix.
     min_samples : int
     sample_weights : array-like or None
         Not supported when metric='precomputed'.
     reproducible : bool
     metric : str
-        'euclidean' (default) or 'precomputed'.
+        'euclidean' (default), 'precomputed', or any metric supported by
+        pynndescent (e.g. 'cosine', 'manhattan', 'minkowski', etc.).
     algorithm : str
         MST algorithm to use: 'boruvka' (default) or 'kruskal'.
         - 'boruvka' : parallel Borůvka via KD-tree for euclidean; Borůvka on
-          CoreGraph (float32) for precomputed.
+          CoreGraph (float32) for precomputed / pynndescent.
         - 'kruskal' : Kruskal DSU on KNN graph for euclidean; Kruskal DSU on
-          full CSR edge list (float64) for precomputed.
+          full CSR edge list (float64) for precomputed / pynndescent.
     knn_k : int or None
-        Only used when algorithm='kruskal' and metric='euclidean'.
-        - None : exact MST via full pairwise distances (O(n^2) memory).
+        Number of neighbors for KNN graph. Used when algorithm='kruskal' and
+        metric='euclidean', or for any pynndescent-backed metric.
+        - None : for euclidean/kruskal, exact MST via full pairwise distances;
+          for pynndescent metrics, defaults to max(3 * min_samples, 15).
         - int  : approximate MST via KNN subgraph with this many neighbors.
+    metric_kwds : dict or None
+        Additional keyword arguments for the distance metric (pynndescent only).
     """
     if algorithm not in ("boruvka", "kruskal"):
         raise ValueError(
@@ -284,6 +294,18 @@ def compute_minimum_spanning_tree(
             from .precomputed import compute_mst_from_precomputed_sparse
 
             return compute_mst_from_precomputed_sparse(data, min_samples)
+
+    if metric not in ("euclidean", "precomputed"):
+        # Arbitrary metric — delegate to pynndescent KNN graph path
+        from .nndescent import compute_mst_from_knn_graph
+
+        return compute_mst_from_knn_graph(
+            data,
+            min_samples=min_samples,
+            metric=metric,
+            metric_kwds=metric_kwds,
+            knn_k=knn_k,
+        )
 
     # metric == "euclidean"
     numba_tree = build_kdtree(data)
@@ -407,6 +429,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         metric="euclidean",
         algorithm="boruvka",
         knn_k=None,
+        metric_kwds=None,
         # Removed **kwargs to comply with scikit-learn's API requirements
     ):
         self.min_cluster_size = min_cluster_size
@@ -422,6 +445,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.metric = metric
         self.algorithm = algorithm
         self.knn_k = knn_k
+        self.metric_kwds = metric_kwds
 
     def fit(self, X, y=None, sample_weight=None, **fit_params):
 
@@ -472,6 +496,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             self._all_finite = True  # no per-row finite filtering needed
         elif self.semi_supervised:
             X, y = check_X_y(X, y, accept_sparse="csr", ensure_all_finite=False)
+            self._raw_data = X
             self._raw_labels = y
             # Replace non-finite labels with -1 labels
             y[~np.isfinite(y)] = -1

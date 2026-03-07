@@ -29,6 +29,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/TutteInstitute/fast_hdbscan"
 
+[project.optional-dependencies]
+nndescent = ["pynndescent>=0.5"]
+
 [tool.setuptools]
 zip-safe = false
 packages = ["fast_hdbscan"]
