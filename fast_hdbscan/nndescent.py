@@ -14,6 +14,13 @@ Rich Hakim & Leland McInnes 2026_03_06.
 import numpy as np
 import scipy.sparse
 
+try:
+    from pynndescent import NNDescent
+
+    HAVE_PYNNDESCENT = True
+except ImportError:
+    HAVE_PYNNDESCENT = False
+
 
 def _check_pynndescent_available():
     """Check that pynndescent is installed, raise informative error if not."""
@@ -59,7 +66,9 @@ def build_knn_graph(
     knn_distances : ndarray of shape (n_samples, n_neighbors), float64
         Distances to the k nearest neighbors (self excluded).
     """
-    from pynndescent import NNDescent
+
+    if not HAVE_PYNNDESCENT:
+        _check_pynndescent_available()
 
     if metric_kwds is None:
         metric_kwds = {}
@@ -71,7 +80,8 @@ def build_knn_graph(
         metric_kwds=metric_kwds,
         n_neighbors=n_neighbors + 1,
         random_state=random_state,
-        low_memory=True,
+        n_trees=8,
+        max_candidates=30,
     )
 
     # neighbor_graph applies distance correction (e.g., alternative cosine → cosine)
