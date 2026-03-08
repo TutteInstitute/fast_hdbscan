@@ -357,6 +357,56 @@ def bridge_forest_with_inf(edges, component_labels, n):
     return np.vstack([edges, bridge_edges])
 
 
+def unbridge_mst(edges):
+    """
+    Strip +inf bridge edges from a bridged MST, returning the MSF and
+    per-node component labels.
+
+    Inverse of ``bridge_forest_with_inf``: given an (n-1, 3) bridged MST,
+    returns the finite edges and an array mapping each node to its connected
+    component (integer label, 0-indexed, ordered by smallest node id).
+
+    Parameters
+    ----------
+    edges : np.ndarray, shape (n-1, 3)
+        Bridged MST with columns (src, dst, weight).  Bridge edges have
+        weight == +inf.
+
+    Returns
+    -------
+    finite_edges : np.ndarray, shape (m, 3)
+        MSF edges (all finite weights).  m <= n-1.
+    component_labels : np.ndarray, shape (n,), dtype int32
+        Per-node component id.  Components are numbered 0..k-1 in order of
+        their smallest node id.
+    """
+    n = int(edges.shape[0]) + 1
+    finite_mask = np.isfinite(edges[:, 2])
+    finite_edges = edges[finite_mask]
+
+    # Build component labels via union-find on finite edges
+    parent = np.arange(n, dtype=np.int32)
+
+    def _find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(finite_edges.shape[0]):
+        u, v = int(finite_edges[i, 0]), int(finite_edges[i, 1])
+        ru, rv = _find(u), _find(v)
+        if ru != rv:
+            parent[rv] = ru
+
+    # Resolve all roots and relabel 0..k-1 by smallest node id
+    roots = np.array([_find(i) for i in range(n)], dtype=np.int32)
+    _, inverse = np.unique(roots, return_inverse=True)
+    component_labels = inverse.astype(np.int32)
+
+    return finite_edges, component_labels
+
+
 def compute_mst_from_precomputed_sparse(X, min_samples):
     """
     Compute the MST from a scipy sparse precomputed pairwise weight matrix.
