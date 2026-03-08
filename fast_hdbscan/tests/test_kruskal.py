@@ -1065,3 +1065,326 @@ class TestCannotLinkAccuracy:
         assert (1, 2) in edge_pairs, "B-C should be in MSF"
         assert (0, 1) in edge_pairs, "A-B should be in MSF"
         assert (2, 3) not in edge_pairs, "C-D must be rejected"
+
+
+# ---------------------------------------------------------------------------
+# Forest clustering tests (clusters_from_spanning_forest)
+# ---------------------------------------------------------------------------
+
+def _check_cl_violations(labels, cl_pairs):
+    """Return list of CL pairs assigned to the same non-noise cluster."""
+    return [
+        (i, j)
+        for i, j in cl_pairs
+        if labels[i] != -1 and labels[j] != -1 and labels[i] == labels[j]
+    ]
+
+
+def _build_3comp_precomputed(n=30):
+    """Build precomputed graph with 3 MSF components after CL extraction.
+
+    Clique A: nodes 0..14 (excluding node 10)
+    Singleton: node 10 (CL'd against all clique A members)
+    Clique B: nodes 15..29 (disconnected from A)
+
+    Returns (G, cl, cl_pairs) where G is sparse distance matrix, cl is
+    CL constraint matrix, cl_pairs is list of (i,j) CL tuples.
+    """
+    rows, cols, data = [], [], []
+    clique_a = [i for i in range(15) if i != 10]
+    for i, ni in enumerate(clique_a):
+        for j in range(i + 1, len(clique_a)):
+            nj = clique_a[j]
+            w = 1.0 + 0.001 * abs(ni - nj)
+            rows += [ni, nj]; cols += [nj, ni]; data += [w, w]
+    for nbr in [8, 9, 11, 12]:
+        rows += [10, nbr]; cols += [nbr, 10]; data += [0.5, 0.5]
+    for i in range(15, n):
+        for j in range(i + 1, n):
+            w = 1.0 + 0.001 * abs(i - j)
+            rows += [i, j]; cols += [j, i]; data += [w, w]
+    G = sparse.csr_matrix((data, (rows, cols)), shape=(n, n), dtype=np.float64)
+    cl_pairs = [(10, nbr) for nbr in clique_a]
+    cl_rows = [p[0] for p in cl_pairs]
+    cl_cols = [p[1] for p in cl_pairs]
+    cl = sparse.csr_matrix(
+        (np.ones(len(cl_pairs), dtype=np.int8), (cl_rows, cl_cols)),
+        shape=(n, n),
+    )
+    return G, cl, cl_pairs
+
+
+class TestForestClustering:
+    """Tests for clusters_from_spanning_forest: per-component cluster selection."""
+
+    def test_3comp_no_violation_precomputed(self):
+        """3 MSF components (precomputed): zero CL violations for EOM and leaf."""
+        G, cl, cl_pairs = _build_3comp_precomputed()
+        for mcs in [2, 5, 10]:
+            for method in ["eom", "leaf"]:
+                labels, _ = fast_hdbscan(
+                    G, min_cluster_size=mcs, min_samples=1,
+                    metric="precomputed", algorithm="kruskal",
+                    cannot_link=cl, cluster_selection_method=method,
+                )
+                v = _check_cl_violations(labels, cl_pairs)
+                assert len(v) == 0, (
+                    f"CL violation (precomputed mcs={mcs} {method}): {v}"
+                )
+
+    def test_3comp_no_violation_euclidean_brute(self):
+        """3 MSF components (euclidean brute): zero CL violations."""
+        rng = np.random.RandomState(42)
+        X = np.vstack([
+            rng.randn(15, 2) * 0.2 + [-5, 0],
+            rng.randn(15, 2) * 0.2 + [5, 0],
+        ])
+        n = X.shape[0]
+        target = 7
+        cl_pairs = [(target, j) for j in range(15) if j != target]
+        cl = _make_cl_matrix(n, cl_pairs)
+
+        for mcs in [2, 5, 10]:
+            for method in ["eom", "leaf"]:
+                labels, _ = fast_hdbscan(
+                    X, min_cluster_size=mcs, min_samples=2,
+                    algorithm="kruskal", knn_k=None, cannot_link=cl,
+                    cluster_selection_method=method,
+                )
+                v = _check_cl_violations(labels, cl_pairs)
+                assert len(v) == 0, (
+                    f"CL violation (brute mcs={mcs} {method}): {v}"
+                )
+
+    def test_3comp_no_violation_euclidean_knn(self):
+        """3 MSF components (euclidean knn): zero CL violations."""
+        rng = np.random.RandomState(42)
+        X = np.vstack([
+            rng.randn(15, 2) * 0.2 + [-5, 0],
+            rng.randn(15, 2) * 0.2 + [5, 0],
+        ])
+        n = X.shape[0]
+        target = 7
+        cl_pairs = [(target, j) for j in range(15) if j != target]
+        cl = _make_cl_matrix(n, cl_pairs)
+
+        for mcs in [2, 5, 10]:
+            for method in ["eom", "leaf"]:
+                labels, _ = fast_hdbscan(
+                    X, min_cluster_size=mcs, min_samples=2,
+                    algorithm="kruskal", knn_k=10, cannot_link=cl,
+                    cluster_selection_method=method,
+                )
+                v = _check_cl_violations(labels, cl_pairs)
+                assert len(v) == 0, (
+                    f"CL violation (knn mcs={mcs} {method}): {v}"
+                )
+
+    def test_singleton_is_noise(self):
+        """A singleton MSF component (node CL'd against all others) is noise."""
+        G, cl, _ = _build_3comp_precomputed()
+        labels, _ = fast_hdbscan(
+            G, min_cluster_size=5, min_samples=1,
+            metric="precomputed", algorithm="kruskal", cannot_link=cl,
+        )
+        assert labels[10] == -1, "Singleton component should be noise"
+
+    def test_small_comp_is_noise(self):
+        """Components smaller than min_cluster_size are all noise."""
+        # Build a graph where CL creates a 3-node component (< mcs=5)
+        n = 20
+        rows, cols, data = [], [], []
+        # Group A: nodes 0..9
+        for i in range(10):
+            for j in range(i + 1, 10):
+                rows += [i, j]; cols += [j, i]; data += [1.0, 1.0]
+        # Group B: nodes 10..12 (3 nodes — too small for mcs=5)
+        for i in range(10, 13):
+            for j in range(i + 1, 13):
+                rows += [i, j]; cols += [j, i]; data += [1.0, 1.0]
+        # Group C: nodes 13..19
+        for i in range(13, n):
+            for j in range(i + 1, n):
+                rows += [i, j]; cols += [j, i]; data += [1.0, 1.0]
+        G = sparse.csr_matrix((data, (rows, cols)), shape=(n, n), dtype=np.float64)
+
+        # CL between group B and groups A/C to keep them separate
+        cl_pairs = [(10, 0), (10, 13)]  # Minimal CL to disconnect
+        cl = _make_cl_matrix(n, cl_pairs)
+
+        labels, _ = fast_hdbscan(
+            G, min_cluster_size=5, min_samples=1,
+            metric="precomputed", algorithm="kruskal", cannot_link=cl,
+        )
+        # Group B (nodes 10-12) should all be noise since comp size=3 < mcs=5
+        assert all(labels[i] == -1 for i in range(10, 13)), \
+            f"Small component should be noise, got: {labels[10:13]}"
+
+    def test_large_comps_independent_labels(self):
+        """Two large components get independent cluster labels."""
+        # Use euclidean data with well-separated blobs for clear density structure
+        rng = np.random.RandomState(42)
+        X = np.vstack([
+            rng.randn(15, 2) * 0.2 + [-5, 0],  # blob A
+            rng.randn(15, 2) * 0.2 + [5, 0],    # blob B
+        ])
+        n = X.shape[0]
+        # CL node 7 vs all other blob A members -> 3 components
+        cl_pairs = [(7, j) for j in range(15) if j != 7]
+        cl = _make_cl_matrix(n, cl_pairs)
+
+        labels, _ = fast_hdbscan(
+            X, min_cluster_size=5, min_samples=2,
+            algorithm="kruskal", knn_k=None, cannot_link=cl,
+        )
+        # Blob A (minus node 7) and Blob B should each have a cluster
+        a_labels = set(labels[i] for i in range(15) if i != 7 and labels[i] != -1)
+        b_labels = set(labels[i] for i in range(15, 30) if labels[i] != -1)
+        assert len(a_labels) > 0, f"Blob A should have clusters, got: {labels[:15]}"
+        assert len(b_labels) > 0, f"Blob B should have clusters, got: {labels[15:]}"
+        assert a_labels.isdisjoint(b_labels), \
+            f"Components should have distinct labels: A={a_labels}, B={b_labels}"
+
+    def test_no_cl_no_forest_path(self):
+        """Without CL, forest path is not used — same results as before."""
+        labels_no_cl, _ = fast_hdbscan(
+            _X_blobs, min_cluster_size=5, algorithm="kruskal", knn_k=10,
+        )
+        labels_none_cl, _ = fast_hdbscan(
+            _X_blobs, min_cluster_size=5, algorithm="kruskal", knn_k=10,
+            cannot_link=None,
+        )
+        np.testing.assert_array_equal(labels_no_cl, labels_none_cl)
+
+    def test_single_component_no_split(self):
+        """CL that doesn't separate anything -> single component -> normal path."""
+        rng = np.random.RandomState(99)
+        X = rng.randn(50, 2) * 0.3 + [0, 0]
+        # CL between very far points in different natural clusters
+        # But with a single blob there's no split — CL prevents merge of these
+        # two points' components, but they're in the same blob.
+        # With a single tight blob and CL(0,1), node 1 becomes a singleton.
+        cl = _make_cl_matrix(50, [(0, 1)])
+        labels, _ = fast_hdbscan(
+            X, min_cluster_size=5, min_samples=2,
+            algorithm="kruskal", knn_k=10, cannot_link=cl,
+        )
+        # Both should be either in different clusters or one is noise
+        if labels[0] != -1 and labels[1] != -1:
+            assert labels[0] != labels[1]
+
+    def test_all_singletons_all_noise(self):
+        """Every pair constrained -> all singletons -> all noise."""
+        n = 6
+        all_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
+        cl = _make_cl_matrix(n, all_pairs)
+        X = np.random.RandomState(42).randn(n, 2)
+        labels, _ = fast_hdbscan(
+            X, min_cluster_size=2, min_samples=1,
+            algorithm="kruskal", knn_k=None, cannot_link=cl,
+        )
+        assert np.all(labels == -1), f"All singletons should be noise, got: {labels}"
+
+    def test_hdbscan_class_forest_no_violations(self):
+        """HDBSCAN class API with CL: no violations in labels."""
+        G, cl, cl_pairs = _build_3comp_precomputed()
+        h = HDBSCAN(
+            min_cluster_size=5, min_samples=1,
+            metric="precomputed", algorithm="kruskal", cannot_link=cl,
+        ).fit(G)
+        v = _check_cl_violations(h.labels_, cl_pairs)
+        assert len(v) == 0, f"HDBSCAN class CL violations: {v}"
+
+    def test_forest_return_trees(self):
+        """Forest path returns valid tree structures."""
+        G, cl, _ = _build_3comp_precomputed()
+        result = fast_hdbscan(
+            G, min_cluster_size=5, min_samples=1,
+            metric="precomputed", algorithm="kruskal",
+            cannot_link=cl, return_trees=True,
+        )
+        labels, probs, linkage_tree, condensed_tree, sorted_mst, neighbors, core_dists = result
+        assert labels.shape == (30,)
+        assert probs.shape == (30,)
+        assert linkage_tree.shape[1] == 4  # standard linkage format
+        assert sorted_mst.shape[0] == 29  # n-1 edges (bridged for trees)
+        assert sorted_mst.shape[1] == 3
+
+    def test_forest_allow_single_cluster(self):
+        """allow_single_cluster with forest: no CL violations."""
+        G, cl, cl_pairs = _build_3comp_precomputed()
+        for method in ["eom", "leaf"]:
+            labels, _ = fast_hdbscan(
+                G, min_cluster_size=5, min_samples=1,
+                metric="precomputed", algorithm="kruskal",
+                cannot_link=cl, cluster_selection_method=method,
+                allow_single_cluster=True,
+            )
+            v = _check_cl_violations(labels, cl_pairs)
+            assert len(v) == 0, (
+                f"allow_single_cluster CL violation ({method}): {v}"
+            )
+
+    def test_forest_epsilon_selection(self):
+        """cluster_selection_epsilon with forest: no CL violations."""
+        G, cl, cl_pairs = _build_3comp_precomputed()
+        labels, _ = fast_hdbscan(
+            G, min_cluster_size=5, min_samples=1,
+            metric="precomputed", algorithm="kruskal",
+            cannot_link=cl, cluster_selection_epsilon=0.5,
+        )
+        v = _check_cl_violations(labels, cl_pairs)
+        assert len(v) == 0, f"epsilon selection CL violations: {v}"
+
+    def test_forest_persistence_selection(self):
+        """cluster_selection_persistence with CL: no violations."""
+        G, cl, cl_pairs = _build_3comp_precomputed()
+        labels, _ = fast_hdbscan(
+            G, min_cluster_size=2, min_samples=1,
+            metric="precomputed", algorithm="kruskal",
+            cannot_link=cl, cluster_selection_persistence=0.1,
+        )
+        v = _check_cl_violations(labels, cl_pairs)
+        assert len(v) == 0, f"persistence selection CL violations: {v}"
+
+    def test_forest_stress_random(self):
+        """Random feature data x random CL: no violations in final labels."""
+        import time
+        min_trials = 20
+        max_seconds = 10.0
+        start = time.perf_counter()
+        trial = 0
+        while trial < min_trials or time.perf_counter() - start < max_seconds:
+            rng = np.random.RandomState(trial + 9000)
+            n = rng.randint(20, 60)
+            X = rng.randn(n, 3)
+
+            # Random CL: 5-15% of all pairs
+            tri_r, tri_c = np.triu_indices(n, k=1)
+            n_possible = len(tri_r)
+            n_cl = rng.randint(
+                max(1, int(n_possible * 0.05)),
+                max(2, int(n_possible * 0.15) + 1),
+            )
+            n_cl = min(n_cl, n_possible)
+            cl_idx = rng.choice(n_possible, n_cl, replace=False)
+            cl_pairs_arr = list(zip(tri_r[cl_idx].tolist(), tri_c[cl_idx].tolist()))
+            cl = _make_cl_matrix(n, cl_pairs_arr)
+
+            mcs = rng.choice([2, 3, 5])
+            method = rng.choice(["eom", "leaf"])
+
+            labels, _ = fast_hdbscan(
+                X, min_cluster_size=mcs, min_samples=2,
+                algorithm="kruskal", knn_k=None, cannot_link=cl,
+                cluster_selection_method=method,
+            )
+            v = _check_cl_violations(labels, cl_pairs_arr)
+            assert len(v) == 0, (
+                f"CL violation at trial {trial} (n={n}, mcs={mcs}, "
+                f"{method}, seed={trial + 9000}): {v}"
+            )
+            trial += 1
+
+        elapsed = time.perf_counter() - start
+        print(f"\n  forest stress: {trial} trials in {elapsed:.2f}s")
