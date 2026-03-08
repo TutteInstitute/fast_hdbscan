@@ -14,6 +14,8 @@ Rich Hakim & Leland McInnes 2026_03_06.
 import numpy as np
 import scipy.sparse
 
+from line_profiler import profile
+
 try:
     from pynndescent import NNDescent
 
@@ -38,6 +40,7 @@ def _check_pynndescent_available():
         )
 
 
+@profile
 def build_knn_graph(
     data, n_neighbors, metric="euclidean", metric_kwds=None, random_state=None
 ):
@@ -80,8 +83,6 @@ def build_knn_graph(
         metric_kwds=metric_kwds,
         n_neighbors=n_neighbors + 1,
         random_state=random_state,
-        n_trees=8,
-        max_candidates=30,
     )
 
     # neighbor_graph applies distance correction (e.g., alternative cosine → cosine)
@@ -209,6 +210,7 @@ def _knn_graph_to_sparse(knn_indices, knn_distances, n):
     return _symmetrize_min_csr(input_coo)
 
 
+@profile
 def compute_mst_from_knn_graph(
     data,
     min_samples,

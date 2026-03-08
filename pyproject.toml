@@ -30,7 +30,7 @@ dependencies = [
 Homepage = "https://github.com/TutteInstitute/fast_hdbscan"
 
 [project.optional-dependencies]
-nndescent = ["pynndescent>=0.5"]
+nndescent = ["pynndescent>=0.6"]
 
 [tool.setuptools]
 zip-safe = false

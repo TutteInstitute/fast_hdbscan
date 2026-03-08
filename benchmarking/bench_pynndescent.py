@@ -121,6 +121,9 @@ def main():
         "Native Boruvka (euclidean)": lambda: run_native_boruvka(
             X, args.min_samples, args.min_cluster_size
         ),
+        "Native Kruskal (euclidean)": lambda: run_native_kruskal(
+            X, args.min_samples, args.min_cluster_size, knn_k
+        ),
         "PyNNDescent + Kruskal (euclidean)": lambda: run_pynndescent_kruskal(
             X, args.min_samples, args.min_cluster_size, knn_k
         ),
