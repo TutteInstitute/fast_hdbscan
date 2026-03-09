@@ -847,7 +847,12 @@ def cluster_epsilon_search(clusters, cluster_tree, min_epsilon=0.0):
     root = cluster_tree.parent.min()
     for cluster in clusters:
         idx = np.searchsorted(cluster_tree.child, cluster)
-        death_eps = 1 / cluster_tree.lambda_val[idx]
+        # lambda=0 arises from distance=inf bridge edges joining disconnected
+        # MSF components (1/inf=0). Inverting back would divide by zero, so
+        # treat as death_eps=inf: born at infinite distance, no finite epsilon
+        # should merge this cluster upward.
+        lam = cluster_tree.lambda_val[idx]
+        death_eps = (1.0 / lam) if lam > 0.0 else np.inf
         if death_eps < min_epsilon:
             if cluster not in processed:
                 parent = traverse_upwards(cluster_tree, min_epsilon, root, cluster)
@@ -863,7 +868,10 @@ def traverse_upwards(cluster_tree, min_epsilon, root, segment):
     parent = cluster_tree.parent[cluster_tree.child == segment][0]
     if parent == root:
         return root
-    parent_death_eps = 1 / cluster_tree.lambda_val[cluster_tree.child == parent][0]
+    # Same lambda=0 guard as cluster_epsilon_search: bridge edges have
+    # lambda=0 (distance=inf), so 1/lambda would divide by zero.
+    parent_lam = cluster_tree.lambda_val[cluster_tree.child == parent][0]
+    parent_death_eps = (1.0 / parent_lam) if parent_lam > 0.0 else np.inf
     if parent_death_eps >= min_epsilon:
         return parent
     else:
@@ -953,6 +961,14 @@ def get_cluster_label_vector(
         child = tree.child[n]
         parent = tree.parent[n]
         if child not in clusters:
+            # Data points at lambda=0 fell out at distance=inf — they came
+            # from bridge edges joining disconnected MSF components. Without
+            # this guard, the DSU unions them into whichever cluster their
+            # bridge-created parent resolves to, which can merge points
+            # across components (violating cannot-link constraints or
+            # producing spurious cross-component cluster assignments).
+            if child < n_samples and tree.lambda_val[n] == 0.0:
+                continue
             ds_union_by_rank(disjoint_set, parent, child)
 
     for n in range(root_cluster):

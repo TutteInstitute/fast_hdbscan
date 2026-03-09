@@ -357,6 +357,56 @@ def bridge_forest_with_inf(edges, component_labels, n):
     return np.vstack([edges, bridge_edges])
 
 
+def unbridge_mst(edges):
+    """
+    Strip +inf bridge edges from a bridged MST, returning the MSF and
+    per-node component labels.
+
+    Inverse of ``bridge_forest_with_inf``: given an (n-1, 3) bridged MST,
+    returns the finite edges and an array mapping each node to its connected
+    component (integer label, 0-indexed, ordered by smallest node id).
+
+    Parameters
+    ----------
+    edges : np.ndarray, shape (n-1, 3)
+        Bridged MST with columns (src, dst, weight).  Bridge edges have
+        weight == +inf.
+
+    Returns
+    -------
+    finite_edges : np.ndarray, shape (m, 3)
+        MSF edges (all finite weights).  m <= n-1.
+    component_labels : np.ndarray, shape (n,), dtype int32
+        Per-node component id.  Components are numbered 0..k-1 in order of
+        their smallest node id.
+    """
+    n = int(edges.shape[0]) + 1
+    finite_mask = np.isfinite(edges[:, 2])
+    finite_edges = edges[finite_mask]
+
+    # Build component labels via union-find on finite edges
+    parent = np.arange(n, dtype=np.int32)
+
+    def _find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(finite_edges.shape[0]):
+        u, v = int(finite_edges[i, 0]), int(finite_edges[i, 1])
+        ru, rv = _find(u), _find(v)
+        if ru != rv:
+            parent[rv] = ru
+
+    # Resolve all roots and relabel 0..k-1 by smallest node id
+    roots = np.array([_find(i) for i in range(n)], dtype=np.int32)
+    _, inverse = np.unique(roots, return_inverse=True)
+    component_labels = inverse.astype(np.int32)
+
+    return finite_edges, component_labels
+
+
 def compute_mst_from_precomputed_sparse(X, min_samples):
     """
     Compute the MST from a scipy sparse precomputed pairwise weight matrix.
@@ -426,7 +476,9 @@ def compute_mst_from_precomputed_sparse(X, min_samples):
     return mst_edges, neighbors, core_distances
 
 
-def compute_mst_from_precomputed_sparse_kruskal(X, min_samples):
+def compute_mst_from_precomputed_sparse_kruskal(
+    X, min_samples, cannot_link=None, validate_cannot_link=True,
+):
     """
     Compute the MST from a scipy sparse precomputed pairwise weight matrix
     using Kruskal's algorithm.
@@ -440,7 +492,7 @@ def compute_mst_from_precomputed_sparse_kruskal(X, min_samples):
     2. Symmetrize by min weight, drop diagonal (vectorized numpy).
     3. Compute core distances in parallel (Numba JIT).
     4. Compute float64 MRD for every stored edge (Numba JIT).
-    5. Global sort + Kruskal DSU (Numba JIT).
+    5. Global sort + Kruskal DSU (Numba JIT), with optional CL constraints.
     6. Bridge disconnected components with +inf edges.
 
     Parameters
@@ -449,6 +501,11 @@ def compute_mst_from_precomputed_sparse_kruskal(X, min_samples):
         Pairwise distance/weight graph. Missing entries = no edge (+inf).
     min_samples : int
         Number of neighbors to use for core distance computation.
+    cannot_link : scipy sparse matrix or None
+        Boolean cannot-link constraints.
+    validate_cannot_link : bool
+        If True (default), validate and symmetrize the cannot-link matrix.
+        Set to False when you know the input is already a symmetric CSR.
 
     Returns
     -------
@@ -456,7 +513,7 @@ def compute_mst_from_precomputed_sparse_kruskal(X, min_samples):
     neighbors : np.ndarray, int32, shape (n, k)
     core_distances : np.ndarray, float64, shape (n,)
     """
-    from .kruskal import kruskal_mst_from_csr
+    from .kruskal import kruskal_mst_from_csr, _validate_cannot_link
 
     validate_precomputed_sparse_graph(X)
     n = X.shape[0]
@@ -469,12 +526,20 @@ def compute_mst_from_precomputed_sparse_kruskal(X, min_samples):
         X_sym.data, X_sym.indices, X_sym.indptr, min_samples
     )
 
-    # 3. Kruskal MST (float64 throughout — no patching needed).
+    # 3. Validate CL constraints if provided.
+    cl_indices, cl_indptr = None, None
+    if cannot_link is not None:
+        cl_indices, cl_indptr = _validate_cannot_link(
+            cannot_link, n, validate=validate_cannot_link
+        )
+
+    # 4. Kruskal MST (float64 throughout — no patching needed).
     n_components, component_labels, mst_edges = kruskal_mst_from_csr(
-        X_sym.data, X_sym.indices, X_sym.indptr, core_distances
+        X_sym.data, X_sym.indices, X_sym.indptr, core_distances,
+        cl_indices=cl_indices, cl_indptr=cl_indptr,
     )
 
-    # 4. Bridge disconnected components with +inf edges.
+    # 5. Bridge disconnected components with +inf edges.
     if n_components > 1:
         mst_edges = bridge_forest_with_inf(mst_edges, component_labels, n)
 
