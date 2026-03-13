@@ -170,41 +170,10 @@ def _knn_graph_to_sparse(knn_indices, knn_distances, n):
     rows = rows[valid]
     cols = cols[valid]
     data = data[valid]
-
-    # Build COO and symmetrize by taking minimum weight per undirected pair
-    coo = scipy.sparse.coo_matrix((data, (rows, cols)), shape=(n, n))
-    csr = coo.tocsr()
-
-    # Symmetrize: for each (i,j), take min(w_ij, w_ji)
-    csr_t = csr.T.tocsr()
-    # Maximum of the two sparse matrices gives us the union of edges,
-    # then we take minimum weights where both exist
-    sym = csr.maximum(csr_t)  # union of sparsity patterns
-    # For entries that exist in both, take the minimum
-    both = csr.multiply(csr_t)  # intersection
-    both_min = both.copy()
-    # Where both exist, use minimum; where only one exists, use that value
-    sym = sym - both + both_min.minimum(both.T)
-
-    # Simpler approach: just symmetrize by taking max of patterns, min of values
-    # Actually, the simplest correct approach:
-    sym = csr.copy()
-    sym_t = csr_t.copy()
-    # Take minimum where both exist, otherwise take whichever exists
-    sym = sym.maximum(sym_t)
-    # Now overwrite with min where both have values
-    overlap = csr.multiply(csr_t > 0)  # entries in csr where csr_t also has entry
-    overlap_t = csr_t.multiply(csr > 0)  # entries in csr_t where csr also has entry
-    min_overlap = overlap.minimum(overlap_t)
-    # Replace overlap entries in sym with min values
-    sym = sym - overlap.maximum(overlap_t) + min_overlap + min_overlap.T
-    # This is getting complicated. Let's use the proven approach from precomputed.py
-
-    # Use the simple vectorized approach: stack both directions, group, take min
     from .precomputed import _symmetrize_min_csr
 
-    input_coo = scipy.sparse.coo_matrix((data, (rows, cols)), shape=(n, n))
-    return _symmetrize_min_csr(input_coo)
+    coo = scipy.sparse.coo_matrix((data, (rows, cols)), shape=(n, n))
+    return _symmetrize_min_csr(coo)
 
 
 def compute_mst_from_knn_graph(
