@@ -263,6 +263,12 @@ def find_sub_clusters(
             "fitted with metric='precomputed'. These detectors require raw feature "
             "vectors to compute lens values."
         )
+    if getattr(clusterer, "_raw_data", None) is None:
+        raise ValueError(
+            "SubClusterDetector and BranchDetector require the clusterer to "
+            "have stored _raw_data during fit. Ensure the model was fitted "
+            "with raw feature vectors."
+        )
     check_is_fitted(
         clusterer,
         "_min_spanning_tree",
