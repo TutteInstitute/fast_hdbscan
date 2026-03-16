@@ -167,7 +167,7 @@ def test_allow_single_cluster_with_filters():
 def test_badargs():
     c_nofit = HDBSCAN(min_cluster_size=5)
 
-    with pytest.raises(TypeError, ValueError):
+    with pytest.raises((TypeError, ValueError)):
         find_branch_sub_clusters("fail")
     with pytest.raises(TypeError):
         find_branch_sub_clusters(None)
