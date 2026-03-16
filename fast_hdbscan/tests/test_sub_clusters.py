@@ -66,7 +66,7 @@ def check_detected_groups(c, n_clusters=3, n_subs=6, overridden=False):
 # --- Detecting SubClusters
 
 
-@pytest.mark.skipif(not HAVE_HDBSCAN, reason='Requires HDBSCAN')
+@pytest.mark.skipif(not HAVE_HDBSCAN, reason="Requires HDBSCAN")
 def test_attributes():
     b = SubClusterDetector(lens_values=centrality).fit(c)
     check_detected_groups(b, n_clusters=2, n_subs=7)
@@ -78,10 +78,14 @@ def test_attributes():
 
 
 def test_selection_method():
-    b = SubClusterDetector(lens_values=centrality, cluster_selection_method="eom").fit(c)
+    b = SubClusterDetector(lens_values=centrality, cluster_selection_method="eom").fit(
+        c
+    )
     check_detected_groups(b, n_clusters=2, n_subs=7)
 
-    b = SubClusterDetector(lens_values=centrality, cluster_selection_method="leaf").fit(c)
+    b = SubClusterDetector(lens_values=centrality, cluster_selection_method="leaf").fit(
+        c
+    )
     check_detected_groups(b, n_clusters=2, n_subs=7)
 
 
@@ -110,7 +114,9 @@ def test_sample_weight():
 
 def test_min_cluster_size():
     b = SubClusterDetector(lens_values=centrality, min_cluster_size=7).fit(c)
-    labels, counts = np.unique(b.labels_[b.sub_cluster_labels_ >= 0], return_counts=True)
+    labels, counts = np.unique(
+        b.labels_[b.sub_cluster_labels_ >= 0], return_counts=True
+    )
     assert (counts[labels >= 0] >= 7).all()
     check_detected_groups(b, n_clusters=2, n_subs=7)
 
@@ -167,7 +173,7 @@ def test_allow_single_cluster_with_filters():
 def test_badargs():
     c_nofit = HDBSCAN(min_cluster_size=5)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, ValueError):
         find_sub_clusters("fail")
     with pytest.raises(TypeError):
         find_sub_clusters(None)

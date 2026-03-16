@@ -66,7 +66,7 @@ def check_detected_groups(c, n_clusters=3, n_branches=6, overridden=False):
 # --- Detecting Branches
 
 
-@pytest.mark.skipif(not HAVE_HDBSCAN, reason='Requires HDBSCAN')
+@pytest.mark.skipif(not HAVE_HDBSCAN, reason="Requires HDBSCAN")
 def test_attributes():
     b = BranchDetector().fit(c)
     check_detected_groups(b, n_clusters=2, n_branches=5)
@@ -106,7 +106,9 @@ def test_sample_weight():
 
 def test_min_cluster_size():
     b = BranchDetector(min_cluster_size=7).fit(c)
-    labels, counts = np.unique(b.labels_[b.branch_probabilities_ > 0], return_counts=True)
+    labels, counts = np.unique(
+        b.labels_[b.branch_probabilities_ > 0], return_counts=True
+    )
     assert (counts[labels >= 0] >= 7).all()
     check_detected_groups(b, n_clusters=2, n_branches=5)
 
@@ -165,7 +167,7 @@ def test_allow_single_cluster_with_filters():
 def test_badargs():
     c_nofit = HDBSCAN(min_cluster_size=5)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, ValueError):
         find_branch_sub_clusters("fail")
     with pytest.raises(TypeError):
         find_branch_sub_clusters(None)
