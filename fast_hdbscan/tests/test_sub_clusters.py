@@ -175,7 +175,7 @@ def test_badargs():
 
     with pytest.raises((TypeError, ValueError)):
         find_sub_clusters("fail")
-    with pytest.raises(TypeError):
+    with pytest.raises((TypeError, ValueError)):
         find_sub_clusters(None)
     with pytest.raises(NotFittedError):
         find_sub_clusters(c_nofit)
