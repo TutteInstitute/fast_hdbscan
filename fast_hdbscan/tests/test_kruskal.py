@@ -1388,3 +1388,483 @@ class TestForestClustering:
 
         elapsed = time.perf_counter() - start
         print(f"\n  forest stress: {trial} trials in {elapsed:.2f}s")
+
+
+# ---------------------------------------------------------------------------
+# Group-label cannot-link tests
+# ---------------------------------------------------------------------------
+
+from fast_hdbscan.kruskal import (
+    _kruskal_core_group_constrained,
+    _validate_cannot_link_groups,
+    _get_component_labels_jit,
+)
+
+
+def _groups_to_cl_pairs(group_labels):
+    """Convert group labels to a list of (i, j) CL pairs (i < j)."""
+    pairs = []
+    groups = {}
+    for idx, g in enumerate(group_labels):
+        if g < 0:
+            continue
+        groups.setdefault(g, []).append(idx)
+    for members in groups.values():
+        for a_idx in range(len(members)):
+            for b_idx in range(a_idx + 1, len(members)):
+                pairs.append((members[a_idx], members[b_idx]))
+    return pairs
+
+
+def _groups_to_cl_matrix(group_labels):
+    """Convert group labels to a sparse CL matrix (upper-triangle)."""
+    pairs = _groups_to_cl_pairs(group_labels)
+    n = len(group_labels)
+    if not pairs:
+        return sparse.csr_matrix((n, n), dtype=np.int8)
+    rows, cols = zip(*pairs)
+    data = np.ones(len(pairs), dtype=np.int8)
+    return sparse.csr_matrix((data, (rows, cols)), shape=(n, n))
+
+
+class TestCannotLinkGroupsValidation:
+    """Tests for _validate_cannot_link_groups."""
+
+    def test_valid_basic(self):
+        """Basic valid input returns correct group_labels and n_groups."""
+        labels = np.array([0, 1, 2, 0, 1], dtype=np.int32)
+        gl, ng = _validate_cannot_link_groups(labels, 5)
+        np.testing.assert_array_equal(gl, labels)
+        assert ng == 3  # max(2) + 1
+
+    def test_all_unconstrained(self):
+        """All -1 labels returns n_groups=0."""
+        labels = np.array([-1, -1, -1, -1], dtype=np.int32)
+        gl, ng = _validate_cannot_link_groups(labels, 4)
+        assert ng == 0
+        np.testing.assert_array_equal(gl, labels)
+
+    def test_wrong_length_raises(self):
+        """Array with wrong length raises ValueError."""
+        labels = np.array([0, 1, 2], dtype=np.int32)
+        with pytest.raises(ValueError, match="does not match"):
+            _validate_cannot_link_groups(labels, 5)
+
+    def test_values_below_minus_one_raises(self):
+        """Values < -1 raise ValueError."""
+        labels = np.array([0, -2, 1], dtype=np.int32)
+        with pytest.raises(ValueError, match="values >= -1"):
+            _validate_cannot_link_groups(labels, 3)
+
+    def test_mixed_unconstrained_and_groups(self):
+        """Mixed -1 and non-negative: n_groups = max + 1."""
+        labels = np.array([-1, 0, -1, 2, 1], dtype=np.int32)
+        gl, ng = _validate_cannot_link_groups(labels, 5)
+        assert ng == 3  # max(2) + 1
+        np.testing.assert_array_equal(gl, labels)
+
+    def test_non_contiguous_group_ids(self):
+        """Non-contiguous group IDs (e.g. 0, 3, 7): n_groups = max + 1 = 8."""
+        labels = np.array([0, 3, 7, 0, 3], dtype=np.int32)
+        gl, ng = _validate_cannot_link_groups(labels, 5)
+        assert ng == 8  # max(7) + 1
+
+
+class TestCannotLinkGroupsCore:
+    """Tests for _kruskal_core_group_constrained JIT function."""
+
+    def test_basic_prevents_same_group_merge(self):
+        """3-node path 0--1--2, group_labels=[0,1,0] -> can't merge 0 and 2."""
+        weights = np.array([1.0, 2.0], dtype=np.float64)
+        row_idx = np.array([0, 1], dtype=np.int32)
+        col_idx = np.array([1, 2], dtype=np.int32)
+        sorted_order = np.array([0, 1], dtype=np.int32)
+        group_labels = np.array([0, 1, 0], dtype=np.int32)
+
+        mst_edges, preds = _kruskal_core_group_constrained(
+            weights, row_idx, col_idx, sorted_order, 3,
+            group_labels, 2,  # n_groups=2
+        )
+        # Edge 0-1 accepted (groups 0,1 — no conflict).
+        # Edge 1-2 rejected: merging {0,1} with {2} would put two group-0
+        # vertices in one component.
+        assert mst_edges.shape[0] == 1
+        assert int(mst_edges[0, 0]) == 0 and int(mst_edges[0, 1]) == 1
+
+    def test_all_unconstrained_matches_unconstrained(self):
+        """All -1 group labels give same result as unconstrained Kruskal."""
+        from fast_hdbscan.kruskal import _kruskal_core
+
+        rng = np.random.RandomState(42)
+        n = 8
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = rng.uniform(0.1, 5.0, size=len(tri_r)).astype(np.float64)
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        group_labels = np.full(n, -1, dtype=np.int32)
+
+        mst_u, _ = _kruskal_core(weights, tri_r, tri_c, so, n)
+        mst_g, _ = _kruskal_core_group_constrained(
+            weights, tri_r, tri_c, so, n, group_labels, 0,
+        )
+        np.testing.assert_array_equal(mst_u, mst_g)
+
+    def test_all_same_group_blocks_everything(self):
+        """All vertices in group 0 -> every edge blocked -> 0 MST edges."""
+        n = 5
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = np.arange(len(tri_r), dtype=np.float64) + 1.0
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+        group_labels = np.zeros(n, dtype=np.int32)
+
+        mst_edges, _ = _kruskal_core_group_constrained(
+            weights, tri_r, tri_c, so, n, group_labels, 1,
+        )
+        assert mst_edges.shape[0] == 0
+
+    def test_transitive_chain(self):
+        """Chain 0-1-2-3, labels=[0,-1,-1,0] -> blocks merging 0 and 3."""
+        weights = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        row_idx = np.array([0, 1, 2], dtype=np.int32)
+        col_idx = np.array([1, 2, 3], dtype=np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+        group_labels = np.array([0, -1, -1, 0], dtype=np.int32)
+
+        mst_edges, preds = _kruskal_core_group_constrained(
+            weights, row_idx, col_idx, so, 4, group_labels, 1,
+        )
+        # 0-1(1) accepted, 1-2(2) accepted, 2-3(3) rejected
+        # (merging {0,1,2} with {3} would put two group-0 vertices together)
+        assert mst_edges.shape[0] == 2
+        labels = _get_component_labels_jit(preds)
+        assert labels[0] != labels[3], "Transitive CL: 0 and 3 must be separated"
+        assert labels[0] == labels[1] == labels[2], "0,1,2 should be in same component"
+
+
+class TestCannotLinkGroupsEntryPoints:
+    """Tests for cannot_link_groups through public entry points."""
+
+    def test_fast_hdbscan_brute(self):
+        """fast_hdbscan() with cannot_link_groups via brute-force (knn_k=None)."""
+        n = _X_blobs.shape[0]
+        group_labels = np.full(n, -1, dtype=np.int32)
+        # Assign first 20 samples to group 0 and last 20 to group 1
+        group_labels[:20] = 0
+        group_labels[-20:] = 1
+
+        labels, probs = fast_hdbscan(
+            _X_blobs, min_cluster_size=5, min_samples=3,
+            algorithm="kruskal", knn_k=None,
+            cannot_link_groups=group_labels,
+        )
+        assert labels.shape == (n,)
+
+    def test_fast_hdbscan_knn(self):
+        """fast_hdbscan() with cannot_link_groups via KNN (knn_k=10)."""
+        n = _X_blobs.shape[0]
+        group_labels = np.full(n, -1, dtype=np.int32)
+        group_labels[:20] = 0
+        group_labels[-20:] = 1
+
+        labels, probs = fast_hdbscan(
+            _X_blobs, min_cluster_size=5, min_samples=3,
+            algorithm="kruskal", knn_k=10,
+            cannot_link_groups=group_labels,
+        )
+        assert labels.shape == (n,)
+
+    def test_compute_minimum_spanning_tree(self):
+        """compute_minimum_spanning_tree() with cannot_link_groups."""
+        n = _X_blobs.shape[0]
+        group_labels = np.full(n, -1, dtype=np.int32)
+        group_labels[:20] = 0
+
+        mst, neighbors, core_dists = compute_minimum_spanning_tree(
+            _X_blobs, min_samples=5, algorithm="kruskal", knn_k=10,
+            cannot_link_groups=group_labels,
+        )
+        assert mst.shape[0] == n - 1
+        assert mst.shape[1] == 3
+
+    def test_hdbscan_class(self):
+        """HDBSCAN class with cannot_link_groups."""
+        n = _X_blobs.shape[0]
+        group_labels = np.full(n, -1, dtype=np.int32)
+        group_labels[:20] = 0
+        group_labels[-20:] = 1
+
+        h = HDBSCAN(
+            min_cluster_size=5, min_samples=3,
+            algorithm="kruskal", knn_k=10,
+            cannot_link_groups=group_labels,
+        ).fit(_X_blobs)
+        assert h.labels_.shape == (n,)
+
+    def test_precomputed(self):
+        """metric='precomputed' + cannot_link_groups."""
+        n = _G_blobs.shape[0]
+        group_labels = np.full(n, -1, dtype=np.int32)
+        group_labels[:20] = 0
+        group_labels[-20:] = 1
+
+        labels, probs = fast_hdbscan(
+            _G_blobs, min_cluster_size=5, min_samples=3,
+            metric="precomputed", algorithm="kruskal",
+            cannot_link_groups=group_labels,
+        )
+        assert labels.shape == (n,)
+
+    def test_both_cl_and_groups_raises(self):
+        """Providing both cannot_link and cannot_link_groups raises ValueError."""
+        n = _X_blobs.shape[0]
+        cl = _make_cl_matrix(n, [(0, n - 1)])
+        group_labels = np.zeros(n, dtype=np.int32)
+
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            fast_hdbscan(
+                _X_blobs, min_cluster_size=5, min_samples=3,
+                algorithm="kruskal", knn_k=10,
+                cannot_link=cl, cannot_link_groups=group_labels,
+            )
+
+    def test_boruvka_with_groups_raises(self):
+        """algorithm='boruvka' + cannot_link_groups raises ValueError."""
+        n = 10
+        group_labels = np.zeros(n, dtype=np.int32)
+        with pytest.raises(ValueError, match="cannot_link"):
+            compute_minimum_spanning_tree(
+                np.random.randn(n, 2), algorithm="boruvka",
+                cannot_link_groups=group_labels,
+            )
+
+    def test_cl_enforced_in_labels(self):
+        """Same-group samples end up in different clusters or noise."""
+        rng = np.random.RandomState(7)
+        X_a = rng.randn(15, 2) + np.array([-5, 0])
+        X_b = rng.randn(15, 2) + np.array([5, 0])
+        X = np.vstack([X_a, X_b])
+        n = X.shape[0]
+
+        # All of blob A in group 0 -> they can't co-cluster
+        group_labels = np.full(n, -1, dtype=np.int32)
+        group_labels[:15] = 0
+
+        labels, _ = fast_hdbscan(
+            X, min_cluster_size=3, min_samples=2,
+            algorithm="kruskal", knn_k=None,
+            cannot_link_groups=group_labels,
+        )
+        # Check no two group-0 samples share a non-noise cluster
+        group_0_labels = labels[:15]
+        non_noise = group_0_labels[group_0_labels != -1]
+        if len(non_noise) > 0:
+            # Each non-noise sample must be in its own cluster (all same-group)
+            assert len(set(non_noise)) == len(non_noise), (
+                f"Same-group samples share clusters: {non_noise}"
+            )
+
+
+class TestCannotLinkGroupsEquivalence:
+    """Group labels produce same results as equivalent sparse CL matrix."""
+
+    def test_small_case_identical_mst(self):
+        """Small case (n=20, 4 groups): identical MST edges vs sparse matrix."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+
+        rng = np.random.RandomState(123)
+        n = 20
+        # Assign 4 groups of 5 samples each
+        group_labels = np.repeat(np.arange(4, dtype=np.int32), 5)
+
+        # Build equivalent sparse CL matrix
+        cl_mat = _groups_to_cl_matrix(group_labels)
+        cl_i, cl_p = _validate_cannot_link(cl_mat, n)
+
+        # Build a random complete graph
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = rng.uniform(0.1, 5.0, size=len(tri_r)).astype(np.float64)
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        # Sparse-matrix CL
+        mst_sparse, _ = _kruskal_core_constrained(
+            weights, tri_r, tri_c, so, n, cl_i, cl_p
+        )
+
+        # Group-label CL
+        mst_group, _ = _kruskal_core_group_constrained(
+            weights, tri_r, tri_c, so, n, group_labels, 4,
+        )
+
+        np.testing.assert_array_equal(
+            mst_sparse, mst_group,
+            err_msg="Group-label and sparse CL MST edges differ",
+        )
+
+    def test_mixed_constrained_unconstrained(self):
+        """Mixed -1 and non-negative labels: equivalence with sparse matrix."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+
+        rng = np.random.RandomState(456)
+        n = 20
+        # Some samples constrained, some unconstrained
+        group_labels = np.array(
+            [0, -1, 1, -1, 0, 1, -1, -1, 2, 2,
+             -1, 0, -1, 1, -1, 2, -1, -1, 0, 1],
+            dtype=np.int32,
+        )
+
+        cl_mat = _groups_to_cl_matrix(group_labels)
+        cl_i, cl_p = _validate_cannot_link(cl_mat, n)
+
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = rng.uniform(0.1, 5.0, size=len(tri_r)).astype(np.float64)
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        mst_sparse, _ = _kruskal_core_constrained(
+            weights, tri_r, tri_c, so, n, cl_i, cl_p
+        )
+        n_groups = int(group_labels.max()) + 1
+        mst_group, _ = _kruskal_core_group_constrained(
+            weights, tri_r, tri_c, so, n, group_labels, n_groups,
+        )
+
+        np.testing.assert_array_equal(
+            mst_sparse, mst_group,
+            err_msg="Mixed constrained/unconstrained MST edges differ",
+        )
+
+    def test_stress_no_violations(self):
+        """Random data, random groups, verify no CL violations (20+ trials)."""
+        import time
+
+        min_trials = 20
+        max_seconds = 10.0
+        start = time.perf_counter()
+        trial = 0
+        while trial < min_trials or time.perf_counter() - start < max_seconds:
+            rng = np.random.RandomState(trial + 11000)
+            n = rng.randint(20, 60)
+            n_groups = rng.randint(2, 8)
+            group_labels = rng.randint(-1, n_groups, size=n).astype(np.int32)
+
+            X = rng.randn(n, 3)
+            mcs = rng.choice([2, 3, 5])
+            method = rng.choice(["eom", "leaf"])
+
+            labels, _ = fast_hdbscan(
+                X, min_cluster_size=mcs, min_samples=2,
+                algorithm="kruskal", knn_k=None,
+                cannot_link_groups=group_labels,
+                cluster_selection_method=method,
+            )
+
+            # Check no CL violations
+            cl_pairs = _groups_to_cl_pairs(group_labels)
+            v = _check_cl_violations(labels, cl_pairs)
+            assert len(v) == 0, (
+                f"CL violation at trial {trial} (n={n}, n_groups={n_groups}, "
+                f"mcs={mcs}, {method}, seed={trial + 11000}): {v}"
+            )
+            trial += 1
+
+        elapsed = time.perf_counter() - start
+        print(f"\n  group CL stress: {trial} trials in {elapsed:.2f}s")
+
+
+class TestCannotLinkGroupsLargeGroups:
+    """Tests with >64 groups requiring multi-word bitmask."""
+
+    @pytest.mark.parametrize("n_groups", [65, 128, 200])
+    def test_large_groups_no_violations(self, n_groups):
+        """Verify n_groups={n_groups} groups work with multi-word bitmask."""
+        rng = np.random.RandomState(n_groups)
+        # At least 2 samples per group to have actual constraints
+        n = n_groups * 2
+        # Assign each pair of samples to a distinct group
+        group_labels = np.repeat(np.arange(n_groups, dtype=np.int32), 2)
+        # Shuffle to mix positions
+        perm = rng.permutation(n)
+        group_labels = group_labels[perm]
+
+        X = rng.randn(n, 3)
+
+        labels, _ = fast_hdbscan(
+            X, min_cluster_size=3, min_samples=2,
+            algorithm="kruskal", knn_k=None,
+            cannot_link_groups=group_labels,
+        )
+
+        cl_pairs = _groups_to_cl_pairs(group_labels)
+        v = _check_cl_violations(labels, cl_pairs)
+        assert len(v) == 0, (
+            f"CL violation with {n_groups} groups: {v[:5]}..."
+        )
+
+    def test_65_groups_core(self):
+        """Verify _kruskal_core_group_constrained works with 65 groups (2 words)."""
+        # Build a small graph where conflict is across the 64-bit boundary
+        n = 5
+        weights = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float64)
+        row_idx = np.array([0, 1, 2, 3], dtype=np.int32)
+        col_idx = np.array([1, 2, 3, 4], dtype=np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        # Node 0 in group 0, node 4 in group 64 (second word) — no conflict
+        # Node 0 in group 0, node 2 in group 0 — conflict
+        group_labels = np.array([0, -1, 0, -1, 64], dtype=np.int32)
+        n_groups = 65
+
+        mst_edges, preds = _kruskal_core_group_constrained(
+            weights, row_idx, col_idx, so, n, group_labels, n_groups,
+        )
+        labels = _get_component_labels_jit(preds)
+        # 0 and 2 are in group 0, so they must be separated
+        assert labels[0] != labels[2], "Group-0 members must be separated"
+        # 0 and 4 are in different groups (0 vs 64), so merge is allowed
+        # if path connects them without violating constraints
+
+    def test_128_groups_core_equivalence(self):
+        """128 groups: verify group-label CL matches sparse-matrix CL."""
+        from fast_hdbscan.kruskal import (
+            _kruskal_core_constrained, _validate_cannot_link,
+        )
+
+        rng = np.random.RandomState(128)
+        n_groups = 128
+        n = 30
+        # Assign random groups (some may be unused)
+        group_labels = rng.randint(0, n_groups, size=n).astype(np.int32)
+
+        cl_mat = _groups_to_cl_matrix(group_labels)
+        cl_i, cl_p = _validate_cannot_link(cl_mat, n)
+
+        tri_r, tri_c = np.triu_indices(n, k=1)
+        weights = rng.uniform(0.1, 5.0, size=len(tri_r)).astype(np.float64)
+        tri_r = tri_r.astype(np.int32)
+        tri_c = tri_c.astype(np.int32)
+        so = np.argsort(weights, kind="stable").astype(np.int32)
+
+        mst_sparse, _ = _kruskal_core_constrained(
+            weights, tri_r, tri_c, so, n, cl_i, cl_p
+        )
+        actual_n_groups = int(group_labels.max()) + 1
+        mst_group, _ = _kruskal_core_group_constrained(
+            weights, tri_r, tri_c, so, n, group_labels, actual_n_groups,
+        )
+
+        np.testing.assert_array_equal(
+            mst_sparse, mst_group,
+            err_msg="128-group MST edges differ from sparse CL equivalent",
+        )

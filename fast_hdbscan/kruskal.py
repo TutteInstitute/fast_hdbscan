@@ -7,6 +7,13 @@ Entry points:
       knn_k=<int> -> approximate MST via KNN subgraph       (O(n*k) memory)
   - kruskal_mst_from_csr            : precomputed sparse distance matrix
 
+Cannot-link constraint modes (mutually exclusive):
+  - Pairwise sparse matrix (cannot_link): linked-list pool in DSU,
+    O(CL_nnz) total conflict-check work.
+  - Group-label array (cannot_link_groups): bitmask per DSU component,
+    O(1) conflict check per merge for ≤64 groups, O(ceil(n_groups/64))
+    for more.  Ideal for block-diagonal CL (same-session / same-batch).
+
 Rich Hakim 2026_03_05.  JIT and algorithm design with Claude Code.
 """
 
@@ -272,6 +279,144 @@ def _kruskal_core_constrained(weights, row_indices, col_indices, sorted_order,
     return mst_edges[:n_mst], predecessors
 
 
+@numba.njit(cache=NUMBA_CACHE)
+def _kruskal_core_group_constrained(weights, row_indices, col_indices,
+                                     sorted_order, n_verts,
+                                     group_labels, n_groups):
+    """
+    Kruskal's MST with group-label cannot-link constraints -> MSF.
+
+    Two samples in the same group (same non-negative label) cannot end up
+    in the same DSU component.  Label ``-1`` means unconstrained.
+
+    Conflict tracking uses a **bitmask per DSU component**: each bit
+    represents a group.  Conflict check is ``(mask_A & mask_B) != 0``;
+    merge is ``mask_new = mask_A | mask_B``.  For ≤64 groups this is a
+    single ``uint64`` AND/OR (1 CPU instruction); for more groups, a
+    short inner loop over ``n_words = ceil(n_groups / 64)`` words.
+
+    This is semantically equivalent to ``_kruskal_core_constrained`` with
+    the full block-diagonal CL sparse matrix, but dramatically faster:
+    O(1) conflict check per edge vs O(CL pairs in smaller component).
+
+    Parameters
+    ----------
+    weights      : float64[:]
+        Edge weights (not necessarily sorted).
+    row_indices  : int32[:]
+        Source vertex for each edge.
+    col_indices  : int32[:]
+        Target vertex for each edge.
+    sorted_order : int32[:]
+        Indices that sort *weights* ascending (from ``np.argsort``).
+    n_verts      : int
+        Number of vertices (nodes 0 … n_verts-1).
+    group_labels : int32[:]
+        Group label per vertex.  Values ≥ 0 identify a group; ``-1``
+        means the vertex is unconstrained and may merge with any group.
+    n_groups     : int
+        Number of distinct non-negative groups.  Determines the bitmask
+        width: ``n_words = ceil(n_groups / 64)``.
+
+    Returns
+    -------
+    mst_edges : float64[:, :], shape (n_mst, 3)
+        Accepted MST/MSF edges, columns ``[src, dst, weight]``.
+        ``n_mst < n_verts - 1`` when constraints cause disconnection.
+    predecessors : int32[:], shape (n_verts,)
+        DSU parent array after the algorithm.  Roots encode components.
+    """
+    predecessors = np.arange(n_verts, dtype=np.int32)
+    rank = np.zeros(n_verts, dtype=np.int32)
+
+    ## Bitmask init: comp_mask[root, w] tracks which groups are present
+    ## in the component rooted at `root`.  Bit (g % 64) in word (g // 64)
+    ## is set if the component contains a vertex with group label g.
+    n_words = (n_groups + 63) // 64  # ceil(n_groups / 64)
+    comp_mask = np.zeros((n_verts, n_words), dtype=np.uint64)
+
+    for i in range(n_verts):
+        g = group_labels[i]
+        if g >= 0:
+            w = g // 64             # which uint64 word
+            b = np.uint64(g % 64)   # which bit within that word
+            comp_mask[i, w] = comp_mask[i, w] | (np.uint64(1) << b)
+
+    mst_edges = np.empty((n_verts - 1, 3), dtype=np.float64)
+    n_mst = 0
+
+    for idx in range(len(sorted_order)):
+        if n_mst == n_verts - 1:
+            break
+        j = sorted_order[idx]
+        u = row_indices[j]
+        v = col_indices[j]
+
+        if u == v:  # skip self-loops
+            continue
+
+        ## Find root of u with full path compression
+        root_u = u
+        while predecessors[root_u] != root_u:
+            root_u = predecessors[root_u]
+        curr = u
+        while curr != root_u:
+            nxt = predecessors[curr]
+            predecessors[curr] = root_u
+            curr = nxt
+
+        ## Find root of v with full path compression
+        root_v = v
+        while predecessors[root_v] != root_v:
+            root_v = predecessors[root_v]
+        curr = v
+        while curr != root_v:
+            nxt = predecessors[curr]
+            predecessors[curr] = root_v
+            curr = nxt
+
+        if root_u == root_v:  # already in same component
+            continue
+
+        ## Conflict check: if any group bit is set in BOTH components,
+        ## merging would put two same-group vertices together -> skip.
+        conflict = False
+        for w in range(n_words):
+            if (comp_mask[root_u, w] & comp_mask[root_v, w]) != np.uint64(0):
+                conflict = True
+                break
+        if conflict:
+            continue
+
+        ## Accept edge: add to MST/MSF
+        mst_edges[n_mst, 0] = np.float64(u)
+        mst_edges[n_mst, 1] = np.float64(v)
+        mst_edges[n_mst, 2] = weights[j]
+        n_mst += 1
+
+        ## Union by rank
+        if rank[root_u] > rank[root_v]:
+            new_root = root_u
+            old_root = root_v
+        elif rank[root_u] < rank[root_v]:
+            new_root = root_v
+            old_root = root_u
+        else:
+            new_root = root_u
+            old_root = root_v
+            rank[new_root] += 1
+
+        predecessors[old_root] = new_root
+
+        ## Merge bitmasks: OR the old_root's mask into new_root's.  O(n_words).
+        for w in range(n_words):
+            comp_mask[new_root, w] = (
+                comp_mask[new_root, w] | comp_mask[old_root, w]
+            )
+
+    return mst_edges[:n_mst], predecessors
+
+
 @numba.njit(parallel=True, cache=NUMBA_CACHE)
 def _compute_mrd_csr_flat(data, indices, indptr, core_distances):
     """
@@ -421,36 +566,234 @@ def _validate_cannot_link(cannot_link, n, validate=True):
     return cl_sym.indices.astype(np.int32), cl_sym.indptr.astype(np.int32)
 
 
-def kruskal_mst_from_csr(sym_data, sym_indices, sym_indptr, core_distances,
-                          cl_indices=None, cl_indptr=None):
+def _validate_cannot_link_groups(cannot_link_groups, n):
     """
-    Kruskal MST from a symmetric CSR graph with precomputed core distances.
+    Validate and normalize a group-label cannot-link array.
 
-    Computes mutual reachability distances (MRD) in float64 for every stored
-    edge, sorts once globally, and applies Kruskal's DSU.  Because the entire
-    pipeline stays in float64, no post-hoc weight-patching step is needed
-    (unlike the Borůvka path which uses a float32 CoreGraph internally).
-
-    This function is called by ``compute_mst_from_precomputed_sparse_kruskal``
-    in ``precomputed.py``.
+    Each entry is a non-negative group index, or -1 for unconstrained.
+    Samples sharing the same non-negative group label cannot co-cluster.
 
     Parameters
     ----------
-    sym_data    : float64[:], CSR edge weights (symmetric, no diagonal)
-    sym_indices : int32[:],   CSR column indices
-    sym_indptr  : int32[:],   CSR row pointers (length n+1)
-    core_distances : float64[:], shape (n,)
-    cl_indices  : int32[:] or None, CSR column indices of symmetric CL graph
-    cl_indptr   : int32[:] or None, CSR row pointers of symmetric CL graph
+    cannot_link_groups : array-like, shape (n,)
+        Integer group labels.  -1 means unconstrained.
+    n : int
+        Expected length (number of samples).
 
     Returns
     -------
-    n_components    : int
-    component_labels : int32[:] shape (n,) — root id per node
-    mst_edges       : float64[:, :] shape (n_mst, 3) — [src, dst, mrd_weight]
-                      n_mst == n-1 when graph is connected; caller bridges if not.
+    group_labels : int32[:], shape (n,)
+        Validated and cast group labels.
+    n_groups : int
+        Number of distinct non-negative groups (max label + 1).
+
+    Raises
+    ------
+    ValueError
+        If shape or values are invalid.
+    """
+    group_labels = np.asarray(cannot_link_groups, dtype=np.int32).ravel()
+
+    ## Length check
+    if group_labels.shape[0] != n:
+        raise ValueError(
+            f"cannot_link_groups length {group_labels.shape[0]} does not "
+            f"match data size {n}."
+        )
+
+    ## Value range check: only -1 (unconstrained) and non-negative labels allowed
+    if np.any(group_labels < -1):
+        raise ValueError(
+            "cannot_link_groups must contain only values >= -1. "
+            "Found values < -1."
+        )
+
+    ## Early return: if all labels are -1, no constraints are active
+    mask = group_labels >= 0
+    if not np.any(mask):
+        return group_labels, 0
+
+    ## n_groups = max_label + 1 (labels need not be contiguous)
+    n_groups = int(group_labels.max()) + 1
+    return group_labels, n_groups
+
+
+def _resolve_cl_params(n, cannot_link=None, validate_cannot_link=True,
+                       cannot_link_groups=None):
+    """
+    Validate and normalize CL constraints into a uniform internal format.
+
+    Accepts two mutually exclusive user-facing constraint modes and returns
+    a dict of low-level arrays that ``_run_kruskal_core`` dispatches on.
+
+    Parameters
+    ----------
+    n : int
+        Number of vertices (samples).
+    cannot_link : scipy sparse matrix or None
+        Pairwise CL constraint matrix, shape (n, n).  Entry (i, j) != 0
+        means samples i and j must not co-cluster.
+    validate_cannot_link : bool
+        If True, validate and symmetrize ``cannot_link``.
+    cannot_link_groups : array-like or None
+        Group-label CL array, shape (n,).  ``int32`` with values ≥ 0
+        for group membership, ``-1`` for unconstrained.
+
+    Returns
+    -------
+    cl : dict
+        Uniform representation with four keys:
+
+        - ``cl_indices`` (int32[:] or None): CSR column indices for pairwise CL.
+        - ``cl_indptr``  (int32[:] or None): CSR row pointers for pairwise CL.
+        - ``cl_group_labels`` (int32[:] or None): validated group labels.
+        - ``cl_n_groups`` (int): number of groups (0 if unconstrained).
+
+    Raises
+    ------
+    ValueError
+        If both ``cannot_link`` and ``cannot_link_groups`` are provided.
+    """
+    if cannot_link is not None and cannot_link_groups is not None:
+        raise ValueError(
+            "cannot_link and cannot_link_groups are mutually exclusive. "
+            "Provide one or the other, not both."
+        )
+
+    cl = dict(cl_indices=None, cl_indptr=None,
+              cl_group_labels=None, cl_n_groups=0)
+
+    if cannot_link is not None:
+        cl["cl_indices"], cl["cl_indptr"] = _validate_cannot_link(
+            cannot_link, n, validate=validate_cannot_link
+        )
+    elif cannot_link_groups is not None:
+        cl["cl_group_labels"], cl["cl_n_groups"] = (
+            _validate_cannot_link_groups(cannot_link_groups, n)
+        )
+
+    return cl
+
+
+def _run_kruskal_core(weights, row_indices, col_indices, sorted_order, n, cl):
+    """
+    Dispatch to the appropriate Kruskal JIT core based on constraint mode.
+
+    Selects one of three code paths:
+
+    1. ``_kruskal_core_group_constrained`` — if group labels are active.
+    2. ``_kruskal_core_constrained``       — if pairwise CSR CL is active.
+    3. ``_kruskal_core``                   — unconstrained (no CL).
+
+    Parameters
+    ----------
+    weights      : float64[:]
+        MRD edge weights.
+    row_indices  : int32[:]
+        Source vertex per edge.
+    col_indices  : int32[:]
+        Target vertex per edge.
+    sorted_order : int32[:]
+        Indices sorting *weights* ascending (from ``np.argsort``).
+    n            : int
+        Number of vertices.
+    cl           : dict
+        Resolved CL parameters from ``_resolve_cl_params``.
+
+    Returns
+    -------
+    mst_edges    : float64[:, 3]
+        Accepted MST/MSF edges ``[src, dst, weight]``.
+    predecessors : int32[:]
+        DSU parent array after the algorithm.
+    """
+    if cl["cl_group_labels"] is not None and cl["cl_n_groups"] > 0:
+        return _kruskal_core_group_constrained(
+            weights, row_indices, col_indices, sorted_order, n,
+            cl["cl_group_labels"], cl["cl_n_groups"],
+        )
+    if cl["cl_indices"] is not None and len(cl["cl_indices"]) > 0:
+        return _kruskal_core_constrained(
+            weights, row_indices, col_indices, sorted_order, n,
+            cl["cl_indices"], cl["cl_indptr"],
+        )
+    return _kruskal_core(weights, row_indices, col_indices, sorted_order, n)
+
+
+def _finish_mst(mst_edges, predecessors, n):
+    """
+    Post-Kruskal: resolve DSU components and bridge disconnected ones.
+
+    When CL constraints (or a sparse KNN graph) produce a spanning forest
+    with multiple components, this function inserts ``+inf`` weighted
+    bridge edges between component representatives so that downstream
+    condensed-tree construction sees a single connected tree.
+
+    Parameters
+    ----------
+    mst_edges    : float64[:, 3]
+        MST/MSF edges from a Kruskal core.
+    predecessors : int32[:]
+        DSU parent array from the same Kruskal core.
+    n            : int
+        Number of vertices.
+
+    Returns
+    -------
+    mst_edges : float64[:, 3]
+        Original edges if single-component; otherwise concatenated with
+        ``(n_components - 1)`` bridge edges of weight ``+inf``.
+    """
+    component_labels = _get_component_labels_jit(predecessors)
+    n_components = int(np.unique(component_labels).shape[0])
+    if n_components > 1:
+        from .precomputed import bridge_forest_with_inf
+        mst_edges = bridge_forest_with_inf(mst_edges, component_labels, n)
+    return mst_edges
+
+
+def kruskal_mst_from_csr(sym_data, sym_indices, sym_indptr, core_distances,
+                          cl=None, **cl_kw):
+    """
+    Kruskal MST from a symmetric CSR distance graph.
+
+    Pipeline: compute MRD weights for every CSR edge (Numba parallel) →
+    global stable argsort → Kruskal DSU (with optional CL constraints).
+    Operates entirely in float64 — no CoreGraph intermediary and no
+    post-hoc weight-patching step are required (unlike the Borůvka path).
+
+    Called by ``compute_mst_from_precomputed_sparse_kruskal`` in
+    ``precomputed.py``.
+
+    Parameters
+    ----------
+    sym_data : float64[:]
+        CSR edge weights of a symmetric distance graph (no diagonal).
+    sym_indices : int32[:]
+        CSR column indices.
+    sym_indptr : int32[:]
+        CSR row pointers, length ``n + 1``.
+    core_distances : float64[:], shape (n,)
+        Per-vertex core distance.
+    cl : dict or None
+        Pre-resolved CL parameters from ``_resolve_cl_params``.  If
+        None, any remaining keyword arguments (``cannot_link``,
+        ``validate_cannot_link``, ``cannot_link_groups``) are forwarded
+        to ``_resolve_cl_params``.
+
+    Returns
+    -------
+    n_components : int
+        Number of connected components in the resulting MST/MSF.
+    component_labels : int32[:], shape (n,)
+        Component root id per vertex.
+    mst_edges : float64[:, :], shape (n_mst, 3)
+        MST edges ``[src, dst, mrd_weight]``.  ``n_mst == n - 1`` when
+        fully connected; fewer when CL constraints fragment the graph.
     """
     n = int(len(sym_indptr) - 1)
+    if cl is None:
+        cl = _resolve_cl_params(n, **cl_kw)
 
     # MRD for every stored edge (parallel over nodes)
     mrd_weights = _compute_mrd_csr_flat(
@@ -463,32 +806,15 @@ def kruskal_mst_from_csr(sym_data, sym_indices, sym_indptr, core_distances,
         np.diff(sym_indptr.astype(np.int64)),
     )
 
-    # Global stable sort by MRD (deterministic tie-breaking)
     sorted_order = np.argsort(mrd_weights, kind="stable").astype(np.int32)
 
-    # Kruskal DSU
-    if cl_indices is not None and len(cl_indices) > 0:
-        mst_edges, predecessors = _kruskal_core_constrained(
-            mrd_weights,
-            row_indices,
-            sym_indices.astype(np.int32),
-            sorted_order,
-            n,
-            cl_indices,
-            cl_indptr,
-        )
-    else:
-        mst_edges, predecessors = _kruskal_core(
-            mrd_weights,
-            row_indices,
-            sym_indices.astype(np.int32),
-            sorted_order,
-            n,
-        )
+    mst_edges, predecessors = _run_kruskal_core(
+        mrd_weights, row_indices, sym_indices.astype(np.int32),
+        sorted_order, n, cl,
+    )
 
     component_labels = _get_component_labels_jit(predecessors)
     n_components = int(np.unique(component_labels).shape[0])
-
     return n_components, component_labels, mst_edges
 
 
@@ -500,6 +826,7 @@ def kruskal_mst_from_feature_matrix(
     reproducible=False,  # noqa: ARG001  (Kruskal is always deterministic)
     cannot_link=None,
     validate_cannot_link=True,
+    cannot_link_groups=None,
 ):
     """
     Kruskal MST for feature data.
@@ -519,11 +846,14 @@ def kruskal_mst_from_feature_matrix(
         Ignored; Kruskal is inherently deterministic.
     cannot_link   : scipy sparse matrix or None
         Boolean sparse matrix of cannot-link constraints.  Must be symmetric.
-        Diagonal entries are ignored.
+        Diagonal entries are ignored.  Mutually exclusive with
+        ``cannot_link_groups``.
     validate_cannot_link : bool
         If True (default), validate and symmetrize the cannot-link matrix.
-        Set to False to skip validation when you know the input is already
-        a symmetric CSR matrix — saves O(nnz) time on large matrices.
+    cannot_link_groups : array-like of int32 or None
+        Group label per sample.  Samples sharing the same non-negative label
+        cannot co-cluster.  -1 means unconstrained.  Mutually exclusive with
+        ``cannot_link``.
 
     Returns
     -------
@@ -531,12 +861,12 @@ def kruskal_mst_from_feature_matrix(
     neighbors      : int32[:, :]   shape (n, k), KNN indices excluding self
     core_distances : float64[:]    shape (n,)
     """
-    cl_indices, cl_indptr = None, None
-    if cannot_link is not None:
-        n = numba_tree.data.shape[0]
-        cl_indices, cl_indptr = _validate_cannot_link(
-            cannot_link, n, validate=validate_cannot_link
-        )
+    n = numba_tree.data.shape[0]
+    cl = _resolve_cl_params(
+        n, cannot_link=cannot_link,
+        validate_cannot_link=validate_cannot_link,
+        cannot_link_groups=cannot_link_groups,
+    )
 
     if knn_k is None:
         if sample_weights is not None:
@@ -544,18 +874,32 @@ def kruskal_mst_from_feature_matrix(
                 "sample_weights with knn_k=None (full pairwise) is not supported. "
                 "Use knn_k=<int> or algorithm='boruvka'."
             )
-        return _kruskal_mst_brute(numba_tree, min_samples, cl_indices, cl_indptr)
-    return _kruskal_mst_knn(
-        numba_tree, min_samples, knn_k, sample_weights, cl_indices, cl_indptr
-    )
+        return _kruskal_mst_brute(numba_tree, min_samples, cl)
+    return _kruskal_mst_knn(numba_tree, min_samples, knn_k, sample_weights, cl)
 
 
-def _kruskal_mst_brute(numba_tree, min_samples, cl_indices=None, cl_indptr=None):
+def _kruskal_mst_brute(numba_tree, min_samples, cl):
     """
-    Exact Kruskal MST from full pairwise distances.
+    Exact Kruskal MST from full pairwise Euclidean distances.
 
-    Computes all n*(n-1)/2 pairwise Euclidean distances, applies mutual
-    reachability, and runs Kruskal.  O(n^2) memory and O(n^2 log n) time.
+    Computes all n*(n-1)/2 pairwise distances via ``cdist``, builds MRD
+    weights for the upper triangle, sorts globally, and runs Kruskal's
+    DSU.  O(n^2) memory and O(n^2 log n) time.
+
+    Parameters
+    ----------
+    numba_tree  : NumbaKDTree
+        KD-tree wrapping the feature data.
+    min_samples : int
+        k for core distance computation.
+    cl          : dict
+        Resolved CL parameters from ``_resolve_cl_params``.
+
+    Returns
+    -------
+    mst_edges      : float64[:, :], shape (n - 1, 3)
+    neighbors      : int32[:, :],   shape (n, k)
+    core_distances : float64[:],    shape (n,)
     """
     from scipy.spatial.distance import cdist
 
@@ -565,10 +909,7 @@ def _kruskal_mst_brute(numba_tree, min_samples, cl_indices=None, cl_indptr=None)
     # Full pairwise Euclidean distances (float64 via cdist)
     D = cdist(data, data).astype(np.float64)
 
-    # Core distances (column 0 of sorted row = self at distance 0).
-    # min_samples=1 -> core_distance=0 by HDBSCAN convention (self-loop).
-    # min_samples=k>1 -> distance to the k-th nearest neighbor (index k
-    # in a row sorted ascending, since index 0 is self at distance 0).
+    # Core distances: min_samples=1 → 0; min_samples=k>1 → k-th NN distance
     if min_samples <= 1:
         core_distances = np.zeros(n, dtype=np.float64)
     elif min_samples < n:
@@ -599,34 +940,41 @@ def _kruskal_mst_brute(numba_tree, min_samples, cl_indices=None, cl_indptr=None)
 
     sorted_order = np.argsort(weights, kind="stable").astype(np.int32)
 
-    if cl_indices is not None and len(cl_indices) > 0:
-        mst_edges, predecessors = _kruskal_core_constrained(
-            weights, tri_r, tri_c, sorted_order, n, cl_indices, cl_indptr
-        )
-        component_labels = _get_component_labels_jit(predecessors)
-        n_components = int(np.unique(component_labels).shape[0])
-        if n_components > 1:
-            from .precomputed import bridge_forest_with_inf
-            mst_edges = bridge_forest_with_inf(mst_edges, component_labels, n)
-    else:
-        mst_edges, _predecessors = _kruskal_core(
-            weights, tri_r, tri_c, sorted_order, n
-        )
-
+    mst_edges, predecessors = _run_kruskal_core(
+        weights, tri_r, tri_c, sorted_order, n, cl,
+    )
+    mst_edges = _finish_mst(mst_edges, predecessors, n)
     return mst_edges, neighbors, core_distances
 
 
-def _kruskal_mst_knn(numba_tree, min_samples, knn_k, sample_weights=None,
-                      cl_indices=None, cl_indptr=None):
+def _kruskal_mst_knn(numba_tree, min_samples, knn_k, sample_weights, cl):
     """
     Approximate Kruskal MST from a KNN subgraph.
 
-    Builds a KNN graph with *knn_k* neighbors per point, applies mutual
-    reachability distances, sorts globally, and runs Kruskal's DSU.
-    Disconnected components are bridged with +inf edges.
+    Pipeline: KD-tree KNN query → MRD edge list (Numba parallel) →
+    filter invalid edges → global stable argsort → Kruskal DSU →
+    bridge disconnected components with +inf edges.
+
+    Parameters
+    ----------
+    numba_tree     : NumbaKDTree
+        KD-tree wrapping the feature data.
+    min_samples    : int
+        k for core distance computation.
+    knn_k          : int
+        Number of nearest neighbors per point for the edge set.
+    sample_weights : float32[:] or None
+        Per-sample weights for weighted core distances.
+    cl             : dict
+        Resolved CL parameters from ``_resolve_cl_params``.
+
+    Returns
+    -------
+    mst_edges      : float64[:, :], shape (n - 1, 3)
+    neighbors_out  : int32[:, :],   shape (n, k)
+    core_distances : float64[:],    shape (n,)
     """
     from .boruvka import sample_weight_core_distance
-    from .precomputed import bridge_forest_with_inf
 
     n = numba_tree.data.shape[0]
 
@@ -677,23 +1025,10 @@ def _kruskal_mst_knn(numba_tree, min_samples, knn_k, sample_weights=None,
     row_idx = row_idx[valid]
     col_idx = col_idx[valid]
 
-    # Global stable sort by MRD (deterministic tie-breaking)
     sorted_order = np.argsort(weights, kind="stable").astype(np.int32)
 
-    # Kruskal DSU
-    if cl_indices is not None and len(cl_indices) > 0:
-        mst_edges, predecessors = _kruskal_core_constrained(
-            weights, row_idx, col_idx, sorted_order, n, cl_indices, cl_indptr
-        )
-    else:
-        mst_edges, predecessors = _kruskal_core(
-            weights, row_idx, col_idx, sorted_order, n
-        )
-
-    component_labels = _get_component_labels_jit(predecessors)
-    n_components = int(np.unique(component_labels).shape[0])
-
-    if n_components > 1:
-        mst_edges = bridge_forest_with_inf(mst_edges, component_labels, n)
-
+    mst_edges, predecessors = _run_kruskal_core(
+        weights, row_idx, col_idx, sorted_order, n, cl,
+    )
+    mst_edges = _finish_mst(mst_edges, predecessors, n)
     return mst_edges, neighbors_out, core_distances
