@@ -9,24 +9,28 @@
 Fast Multicore HDBSCAN
 ======================
 
-The ``fast_hdbscan`` library provides a simple implementation of the HDBSCAN clustering algorithm designed specifically
-for high performance on multicore machine with low dimensional data (2D to about 20D). The algorithm runs in parallel and can make
+The ``fast_hdbscan`` library provides an implementation of the HDBSCAN clustering algorithm designed specifically
+for high performance on multicore machine. The algorithm runs in parallel and can make
 effective use of as many cores as you wish to throw at a problem. It is thus ideal for large SMP systems, and even
 modern multicore laptops.
 
 This library provides a
 re-implementation of a subset of the HDBSCAN algorithm that is compatible with the
-`hdbscan <https://github.com/scikit-learn-contrib/hdbscan>`_ library for data that is Euclidean and
-low dimensional. The primary advantages of this library over the standard ``hdbscan`` library are:
+`hdbscan <https://github.com/scikit-learn-contrib/hdbscan>`_ library. There are specific optimizationsfor data that is Euclidean and
+low dimensional, other distance metrics and high dimensional data fallback to alternative parallel approaches that are faster than the
+hdbscan library, but not necessarily as performant as the highly optimized low-dimensional Euclidean case. 
+The primary advantages of this library over the standard ``hdbscan`` library are:
 
 
  * this library can easily use all available cores to speed up computation;
  * this library has much faster implementations of tree condensing and cluster extraction;
  * this library is much simpler and more approachable for extending or using components from;
  * this library is built on numba and has less issues with binaries and compilation.
+ * this library provides features such as semi-supervision, linking constraints, sample weights, and branch detection from FLASC, and an implemntation of PLSCAN.
 
-This library does not support all the features and input formats available in the hdbscan library. However, this
-library does support a number of research extensions to HDBSCAN including branch detection
+This library does not support *all* the features and input formats available in the hdbscan library, but covers the most common use cases. 
+
+This library does support a number of research extensions to HDBSCAN including branch detection
 from `FLASC <https://peerj.com/articles/cs-2792/>`_ and the semi-supervised clustering methods, 
 as well as support for sample weights.
 
@@ -78,6 +82,10 @@ fast_hdbscan requires:
  * numba
  * numpy
  * scikit-learn
+
+if you need more than just Euclidean distance, or support for high dimensional data, you will also need:
+
+ * pynndescent
 
 fast_hdbscan can be installed via pip:
 
