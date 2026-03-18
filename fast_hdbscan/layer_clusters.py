@@ -9,10 +9,8 @@ from .cluster_trees import (
     get_point_membership_strength_vector,
     mask_condensed_tree,
 )
-from .numba_kdtree import kdtree_to_numba, build_kdtree
+from .numba_kdtree import build_kdtree
 from .boruvka import parallel_boruvka
-
-from sklearn.neighbors import KDTree
 
 from typing import NewType, List, Tuple, Dict, Optional
 
@@ -192,9 +190,13 @@ def min_cluster_size_barcode(cluster_tree, n_points, min_size):
     for idx in range(n_rows - 1, 0, -2):
         out_idx = cluster_tree.child[idx] - n_points
         parents[out_idx - 1 : out_idx + 1] = cluster_tree.parent[idx]
-        lambda_deaths[out_idx - 1 : out_idx + 1] = np.exp(
-            -1 / cluster_tree.lambda_val[idx]
-        )
+        lv = cluster_tree.lambda_val[idx]
+        if lv > 0.0:
+            lambda_deaths[out_idx - 1 : out_idx + 1] = np.exp(-1.0 / lv)
+        else:
+            # lambda_val == 0 means infinite distance (disconnected components);
+            # treat as if the split happened at the very bottom of the hierarchy.
+            lambda_deaths[out_idx - 1 : out_idx + 1] = 0.0
 
         death_size = cluster_tree.child_size[idx - 1 : idx + 1].min()
         size_deaths[out_idx - 1 : out_idx + 1] = death_size
@@ -354,30 +356,43 @@ def build_cluster_layers(
     layer_similarity_threshold=0.2,
     max_layers=10,
     sample_weights=None,
+    metric="euclidean",
+    algorithm="boruvka",
+    knn_k=None,
+    cannot_link=None,
+    validate_cannot_link=True,
+    metric_kwds=None,
     verbose=False,
 ):
+    from .hdbscan import compute_minimum_spanning_tree
+
     n_samples = data.shape[0]
     min_cluster_size = base_min_cluster_size
     cluster_layers = []
     membership_strength_layers = []
     persistence_scores = []
 
-    n_threads = numba.get_num_threads()
-
     if verbose:
-        print("Constructing KDTree ...")
-    numba_tree = build_kdtree(data.astype(np.float32))
-    if verbose:
-        print("Computing MST using Boruvka's algorithm ...")
-    edges, neighbors, core_distances = parallel_boruvka(
-        numba_tree,
-        n_threads,
+        print("Computing MST ...")
+    edges, neighbors, core_distances = compute_minimum_spanning_tree(
+        data,
         min_samples=min_cluster_size if min_samples is None else min_samples,
         sample_weights=sample_weights,
         reproducible=reproducible,
+        metric=metric,
+        algorithm=algorithm,
+        knn_k=knn_k,
+        cannot_link=cannot_link,
+        validate_cannot_link=validate_cannot_link,
+        metric_kwds=metric_kwds,
     )
-    mean_core_distance = np.mean(core_distances)
-    min_core_distance = np.min(core_distances)
+    finite_core = core_distances[np.isfinite(core_distances)]
+    if len(finite_core) > 0:
+        mean_core_distance = np.mean(finite_core)
+        min_core_distance = np.min(finite_core)
+    else:
+        mean_core_distance = 0.0
+        min_core_distance = 0.0
     if mean_core_distance > min_core_distance and np.isfinite(mean_core_distance):
         edges[:, 2] -= min_core_distance
         edges[:, 2] /= mean_core_distance - min_core_distance

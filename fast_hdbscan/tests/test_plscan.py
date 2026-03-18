@@ -499,6 +499,173 @@ def test_plscan_verbose_mode():
         sys.stdout = old_stdout
 
 
+# -----------------------------------------------------------------------
+# Tests for precomputed, pynndescent, kruskal, and cannot-link support
+# -----------------------------------------------------------------------
+
+
+def _make_precomputed_graph(X_data):
+    """Build a symmetric sparse full pairwise distance graph from feature data."""
+    from scipy.spatial.distance import squareform, pdist
+    import scipy.sparse
+
+    dists = squareform(pdist(X_data, metric="euclidean"))
+    np.fill_diagonal(dists, 0.0)
+    return scipy.sparse.csr_matrix(dists)
+
+
+def test_plscan_precomputed_basic():
+    """PLSCAN with metric='precomputed' should produce valid clusters."""
+    G = _make_precomputed_graph(X)
+    model = PLSCAN(metric="precomputed", base_min_cluster_size=5).fit(G)
+    assert hasattr(model, "labels_")
+    assert len(model.labels_) == X.shape[0]
+    assert hasattr(model, "cluster_layers_")
+    assert len(model.cluster_layers_) >= 1
+    n_clusters_found = len(set(model.labels_)) - int(-1 in model.labels_)
+    assert n_clusters_found >= 1
+
+
+def test_plscan_precomputed_rejects_sample_weights():
+    """sample_weight is not supported with precomputed metric."""
+    G = _make_precomputed_graph(X)
+    weights = np.ones(X.shape[0])
+    model = PLSCAN(metric="precomputed")
+    with pytest.raises(NotImplementedError, match="sample_weight"):
+        model.fit(G, sample_weight=weights)
+
+
+def test_plscan_precomputed_raw_data_is_none():
+    """_raw_data should be None for precomputed metric."""
+    G = _make_precomputed_graph(X)
+    model = PLSCAN(metric="precomputed", base_min_cluster_size=5).fit(G)
+    assert model._raw_data is None
+
+
+def test_plscan_precomputed_layers():
+    """PLSCAN with precomputed metric should produce multiple layers."""
+    G = _make_precomputed_graph(X)
+    model = PLSCAN(
+        metric="precomputed",
+        base_min_cluster_size=5,
+        max_layers=5,
+        layer_similarity_threshold=0.1,
+    ).fit(G)
+    assert len(model.cluster_layers_) >= 1
+    for layer in model.cluster_layers_:
+        assert len(layer) == X.shape[0]
+
+
+def test_plscan_kruskal_euclidean():
+    """PLSCAN with algorithm='kruskal' on euclidean data should work."""
+    model = PLSCAN(algorithm="kruskal", knn_k=15).fit(X)
+    assert hasattr(model, "labels_")
+    assert len(model.labels_) == X.shape[0]
+    n_clusters_found = len(set(model.labels_)) - int(-1 in model.labels_)
+    assert n_clusters_found >= 1
+
+
+def test_plscan_kruskal_precomputed():
+    """PLSCAN with algorithm='kruskal' and metric='precomputed'."""
+    G = _make_precomputed_graph(X)
+    model = PLSCAN(
+        metric="precomputed", algorithm="kruskal", base_min_cluster_size=5
+    ).fit(G)
+    assert hasattr(model, "labels_")
+    assert len(model.labels_) == X.shape[0]
+    n_clusters_found = len(set(model.labels_)) - int(-1 in model.labels_)
+    assert n_clusters_found >= 1
+
+
+def test_plscan_cannot_link():
+    """PLSCAN with cannot-link constraints via Kruskal."""
+    import scipy.sparse
+
+    G = _make_precomputed_graph(X)
+    # Create a simple cannot-link constraint between first two points
+    cl_rows = [0, 1]
+    cl_cols = [1, 0]
+    cl_data = [True, True]
+    cannot_link = scipy.sparse.csr_matrix(
+        (cl_data, (cl_rows, cl_cols)), shape=(X.shape[0], X.shape[0])
+    )
+    model = PLSCAN(
+        metric="precomputed",
+        algorithm="kruskal",
+        cannot_link=cannot_link,
+        base_min_cluster_size=5,
+    ).fit(G)
+    assert hasattr(model, "labels_")
+    assert len(model.labels_) == X.shape[0]
+
+
+def test_plscan_cannot_link_requires_kruskal():
+    """cannot_link with algorithm='boruvka' should raise ValueError."""
+    import scipy.sparse
+
+    cannot_link = scipy.sparse.csr_matrix((X.shape[0], X.shape[0]))
+    with pytest.raises(ValueError, match="cannot_link"):
+        PLSCAN(algorithm="boruvka", cannot_link=cannot_link)
+
+
+def test_plscan_invalid_algorithm():
+    """Invalid algorithm parameter should raise ValueError."""
+    with pytest.raises(ValueError, match="algorithm"):
+        PLSCAN(algorithm="invalid")
+
+
+def test_plscan_get_params_includes_new_params():
+    """get_params should include all new metric/algorithm parameters."""
+    model = PLSCAN(
+        metric="precomputed",
+        algorithm="kruskal",
+        knn_k=20,
+    )
+    params = model.get_params()
+    assert params["metric"] == "precomputed"
+    assert params["algorithm"] == "kruskal"
+    assert params["knn_k"] == 20
+    assert params["cannot_link"] is None
+    assert params["validate_cannot_link"] is True
+    assert params["metric_kwds"] is None
+
+
+try:
+    import pynndescent
+
+    _HAVE_PYNNDESCENT = True
+except ImportError:
+    _HAVE_PYNNDESCENT = False
+
+
+@pytest.mark.skipif(not _HAVE_PYNNDESCENT, reason="pynndescent not installed")
+def test_plscan_pynndescent_cosine():
+    """PLSCAN with metric='cosine' via pynndescent should work."""
+    model = PLSCAN(metric="cosine", base_min_cluster_size=5).fit(X)
+    assert hasattr(model, "labels_")
+    assert len(model.labels_) == X.shape[0]
+    n_clusters_found = len(set(model.labels_)) - int(-1 in model.labels_)
+    assert n_clusters_found >= 1
+
+
+@pytest.mark.skipif(not _HAVE_PYNNDESCENT, reason="pynndescent not installed")
+def test_plscan_pynndescent_manhattan():
+    """PLSCAN with metric='manhattan' via pynndescent should work."""
+    model = PLSCAN(metric="manhattan", base_min_cluster_size=5).fit(X)
+    assert hasattr(model, "labels_")
+    assert len(model.labels_) == X.shape[0]
+
+
+@pytest.mark.skipif(not _HAVE_PYNNDESCENT, reason="pynndescent not installed")
+def test_plscan_pynndescent_rejects_sparse():
+    """Non-euclidean/non-precomputed metrics should reject sparse input."""
+    import scipy.sparse
+
+    sparse_X = scipy.sparse.csr_matrix(X)
+    with pytest.raises(ValueError, match="dense"):
+        PLSCAN(metric="cosine").fit(sparse_X)
+
+
 def test_plscan_combined_parameters():
     """Test various combinations of parameters work together."""
     configs = [
