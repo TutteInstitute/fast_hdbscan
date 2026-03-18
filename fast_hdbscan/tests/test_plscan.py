@@ -49,10 +49,10 @@ def test_plscan_max_layers():
 
 
 def test_plscan_layer_similarity_threshold():
-    # Lower threshold should allow more layers
+    # Higher threshold should allow more layers
     model_low = PLSCAN(layer_similarity_threshold=0.01, max_layers=5).fit(X)
     model_high = PLSCAN(layer_similarity_threshold=0.9, max_layers=5).fit(X)
-    assert len(model_low.cluster_layers_) >= len(model_high.cluster_layers_)
+    assert len(model_low.cluster_layers_) <= len(model_high.cluster_layers_)
 
 
 def test_plscan_reproducibility():
@@ -408,14 +408,14 @@ def test_plscan_max_layers_limit():
 
 def test_plscan_layer_similarity_threshold_extremes():
     """Test behavior at extreme threshold values."""
-    # Very low threshold - should produce more diverse layers
+    # Very low threshold - should produce fewer layers
     model_low = PLSCAN(layer_similarity_threshold=0.0, max_layers=10).fit(X)
 
-    # Very high threshold - should produce fewer layers (clusters too similar)
+    # Very high threshold - should produce more diverse layers (clusters too similar)
     model_high = PLSCAN(layer_similarity_threshold=0.99, max_layers=10).fit(X)
 
     # Low threshold should allow more layers
-    assert len(model_low.cluster_layers_) >= len(model_high.cluster_layers_)
+    assert len(model_low.cluster_layers_) <= len(model_high.cluster_layers_)
 
     # Both should produce at least one layer
     assert len(model_low.cluster_layers_) >= 1

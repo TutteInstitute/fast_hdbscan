@@ -354,7 +354,7 @@ def compute_minimum_spanning_tree(
 
             return compute_mst_from_precomputed_sparse(data, min_samples)
 
-    if metric not in ("euclidean", "precomputed"):
+    if metric not in ("euclidean", "precomputed") or data.shape[1] > 30:
         # Arbitrary metric — delegate to pynndescent KNN graph path
         from .nndescent import compute_mst_from_knn_graph
 
@@ -794,7 +794,7 @@ class PLSCAN(ClusterMixin, BaseEstimator):
         *,
         min_samples: int = 5,
         max_layers: int = 10,
-        base_min_cluster_size: int = 10,
+        base_min_cluster_size: int = 5,
         base_n_clusters: Optional[int] = None,
         layer_similarity_threshold: float = 0.2,
         reproducible: bool = False,

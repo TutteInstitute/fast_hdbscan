@@ -7,7 +7,7 @@ name = "fast_hdbscan"
 version = "0.3.0"
 authors = [{name = "Leland McInnes", email = "leland.mcinnes@gmail.com"}]
 maintainers = [{name = "Leland McInnes", email = "leland.mcinnes@gmail.com"}]
-description = "A fast multicore version of hdbscan and plscan for low dimensional euclidean spaces"
+description = "A fast multicore version of HDBSCAN and PLSCAN clustering algorithms."
 readme = "README.rst"
 keywords = ["cluster", "clustering", "hdbscan", "dbscan", "plscan"]
 license = "BSD-2-Clause"
