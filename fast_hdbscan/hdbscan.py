@@ -159,8 +159,13 @@ def fast_hdbscan(
     knn_k=None,
     cannot_link=None,
     validate_cannot_link=True,
+    cannot_link_groups=None,
     metric_kwds=None,
 ):
+    """
+    Run the full HDBSCAN pipeline: MST construction, condensed tree
+    extraction, and cluster selection.
+    """
     if metric == "precomputed":
         if sample_weights is not None:
             raise NotImplementedError(
@@ -218,6 +223,7 @@ def fast_hdbscan(
         knn_k=knn_k,
         cannot_link=cannot_link,
         validate_cannot_link=validate_cannot_link,
+        cannot_link_groups=cannot_link_groups,
         metric_kwds=metric_kwds,
     )
 
@@ -250,6 +256,7 @@ def compute_minimum_spanning_tree(
     knn_k=None,
     cannot_link=None,
     validate_cannot_link=True,
+    cannot_link_groups=None,
     metric_kwds=None,
 ):
     """
@@ -280,22 +287,48 @@ def compute_minimum_spanning_tree(
           for pynndescent metrics, defaults to max(3 * min_samples, 15).
         - int  : approximate MST via KNN subgraph with this many neighbors.
     cannot_link : scipy sparse matrix or None
-        Symmetric sparse matrix of cannot-link constraints.  Only supported
-        with algorithm='kruskal'.
+        Symmetric sparse matrix of cannot-link constraints.  Entry (i, j) != 0
+        means samples i and j must not co-cluster.  Only supported with
+        ``algorithm='kruskal'``.  Mutually exclusive with
+        ``cannot_link_groups``.
     validate_cannot_link : bool
         If True (default), validate and symmetrize the cannot-link matrix
         (handles upper-triangle-only and lower-triangle-only inputs).
         Set to False to skip validation when you know the input is already
         a symmetric CSR matrix — avoids an O(nnz) symmetrization step.
+    cannot_link_groups : array-like of int or None
+        Group-label cannot-link constraints.  An ``int32[n_samples]`` array
+        where samples sharing the same non-negative label cannot co-cluster.
+        ``-1`` means unconstrained.  This is an O(n) alternative to the
+        O(n * k^2) sparse ``cannot_link`` matrix for block-diagonal
+        constraint structures (e.g., same-session, same-batch).  Only
+        supported with ``algorithm='kruskal'``.  Mutually exclusive with
+        ``cannot_link``.
     metric_kwds : dict or None
         Additional keyword arguments for the distance metric (pynndescent only).
+
+    Returns
+    -------
+    mst_edges : float64[:, :], shape (n_samples - 1, 3)
+        Minimum spanning tree edges, columns [src, dst, mrd_weight].
+    neighbors : int32[:, :], shape (n_samples, k)
+        Nearest-neighbor indices for each sample.
+    core_distances : float64[:], shape (n_samples,)
+        Core distance for each sample.
     """
     if algorithm not in ("boruvka", "kruskal"):
         raise ValueError(
             "algorithm must be 'boruvka' or 'kruskal'. Got: %s" % algorithm
         )
 
-    if cannot_link is not None and algorithm != "kruskal":
+    if cannot_link is not None and cannot_link_groups is not None:
+        raise ValueError(
+            "cannot_link and cannot_link_groups are mutually exclusive. "
+            "Provide one or the other, not both."
+        )
+
+    _has_cl = cannot_link is not None or cannot_link_groups is not None
+    if _has_cl and algorithm != "kruskal":
         raise ValueError(
             "cannot_link constraints are only supported with "
             "algorithm='kruskal'. Got algorithm=%r." % algorithm
@@ -314,6 +347,7 @@ def compute_minimum_spanning_tree(
                 min_samples,
                 cannot_link=cannot_link,
                 validate_cannot_link=validate_cannot_link,
+                cannot_link_groups=cannot_link_groups,
             )
         else:
             from .precomputed import compute_mst_from_precomputed_sparse
@@ -346,6 +380,7 @@ def compute_minimum_spanning_tree(
             reproducible=reproducible,
             cannot_link=cannot_link,
             validate_cannot_link=validate_cannot_link,
+            cannot_link_groups=cannot_link_groups,
         )
     else:
         n_threads = numba.get_num_threads()
@@ -440,6 +475,74 @@ def clusters_from_spanning_tree(
 
 
 class HDBSCAN(ClusterMixin, BaseEstimator):
+    """
+    Hierarchical Density-Based Spatial Clustering (HDBSCAN).
+
+    Scikit-learn compatible estimator wrapping :func:`fast_hdbscan`.
+
+    Cannot-link constraints
+    -----------------------
+    Two mutually exclusive modes are supported (both require
+    ``algorithm='kruskal'``):
+
+    * **Pairwise** (``cannot_link``): an ``(n, n)`` sparse boolean matrix
+      where entry ``(i, j) != 0`` forbids samples *i* and *j* from
+      co-clustering.  Supports arbitrary constraint structures.
+    * **Group-label** (``cannot_link_groups``): an ``int32[n]`` array where
+      samples sharing the same non-negative label cannot co-cluster
+      (``-1`` = unconstrained).  O(n) memory and O(1) per-merge conflict
+      check via bitmask, ideal for block-diagonal constraints
+      (same-session / same-batch / same-replicate).
+
+    Parameters
+    ----------
+    min_cluster_size : int
+        Minimum number of samples in a cluster.
+    min_samples : int or None
+        Number of neighbors for core distance.  Defaults to
+        ``min_cluster_size`` if None.
+    cluster_selection_method : str
+        ``'eom'`` (excess of mass) or ``'leaf'``.
+    allow_single_cluster : bool
+        If True, allow returning a single cluster.
+    max_cluster_size : float
+        Upper bound on cluster size (EOM only).
+    cluster_selection_epsilon : float
+        DBSCAN-style epsilon threshold for cluster selection.
+    cluster_selection_persistence : float
+        Minimum persistence for a cluster to be selected.
+    semi_supervised : bool
+        Enable semi-supervised clustering.
+    ss_algorithm : str
+        Semi-supervised algorithm: ``'bc'`` or ``'bc_simple'``.
+    reproducible : bool
+        If True, use deterministic algorithms (Borůvka only; Kruskal
+        is always deterministic).
+    metric : str
+        ``'euclidean'``, ``'precomputed'``, or any pynndescent metric.
+    algorithm : str
+        ``'boruvka'`` or ``'kruskal'``.
+    knn_k : int or None
+        Number of nearest neighbors for KNN graph (Kruskal only).
+    cannot_link : scipy sparse matrix or None
+        Pairwise cannot-link constraint matrix.  Mutually exclusive with
+        ``cannot_link_groups``.
+    validate_cannot_link : bool
+        If True, validate and symmetrize the CL matrix.
+    cannot_link_groups : array-like of int or None
+        Group-label cannot-link constraints (``int32[n]``, ``-1`` =
+        unconstrained).  Mutually exclusive with ``cannot_link``.
+    metric_kwds : dict or None
+        Keyword arguments for the distance metric (pynndescent only).
+
+    Attributes
+    ----------
+    labels_ : int32[:], shape (n_samples,)
+        Cluster labels.  ``-1`` indicates noise.
+    probabilities_ : float64[:], shape (n_samples,)
+        Cluster membership strengths in [0, 1].
+    """
+
     def __init__(
         self,
         *,
@@ -458,6 +561,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         knn_k=None,
         cannot_link=None,
         validate_cannot_link=True,
+        cannot_link_groups=None,
         metric_kwds=None,
         # Removed **kwargs to comply with scikit-learn's API requirements
     ):
@@ -476,6 +580,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.knn_k = knn_k
         self.cannot_link = cannot_link
         self.validate_cannot_link = validate_cannot_link
+        self.cannot_link_groups = cannot_link_groups
         self.metric_kwds = metric_kwds
 
     def fit(self, X, y=None, sample_weight=None, **fit_params):

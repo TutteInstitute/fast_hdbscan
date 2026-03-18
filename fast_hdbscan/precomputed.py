@@ -478,6 +478,7 @@ def compute_mst_from_precomputed_sparse(X, min_samples):
 
 def compute_mst_from_precomputed_sparse_kruskal(
     X, min_samples, cannot_link=None, validate_cannot_link=True,
+    cannot_link_groups=None,
 ):
     """
     Compute the MST from a scipy sparse precomputed pairwise weight matrix
@@ -498,22 +499,33 @@ def compute_mst_from_precomputed_sparse_kruskal(
     Parameters
     ----------
     X : scipy sparse matrix, shape (n, n)
-        Pairwise distance/weight graph. Missing entries = no edge (+inf).
+        Pairwise distance/weight graph.  Missing entries = no edge (+inf).
     min_samples : int
         Number of neighbors to use for core distance computation.
     cannot_link : scipy sparse matrix or None
-        Boolean cannot-link constraints.
+        Pairwise cannot-link constraint matrix.  Entry (i, j) != 0 means
+        samples i and j must not co-cluster.  Mutually exclusive with
+        ``cannot_link_groups``.
     validate_cannot_link : bool
         If True (default), validate and symmetrize the cannot-link matrix.
         Set to False when you know the input is already a symmetric CSR.
+    cannot_link_groups : array-like of int or None
+        Group-label cannot-link constraints.  ``int32[n]`` where samples
+        sharing the same non-negative label cannot co-cluster; ``-1``
+        means unconstrained.  O(n) alternative to the sparse
+        ``cannot_link`` matrix for block-diagonal constraints.
+        Mutually exclusive with ``cannot_link``.
 
     Returns
     -------
-    edges : np.ndarray, shape (n-1, 3), columns [src, dst, mrd_weight]
-    neighbors : np.ndarray, int32, shape (n, k)
-    core_distances : np.ndarray, float64, shape (n,)
+    edges : float64[:, :], shape (n - 1, 3)
+        MST edges, columns ``[src, dst, mrd_weight]``.
+    neighbors : int32[:, :], shape (n, k)
+        Nearest-neighbor indices per sample.
+    core_distances : float64[:], shape (n,)
+        Core distance per sample.
     """
-    from .kruskal import kruskal_mst_from_csr, _validate_cannot_link
+    from .kruskal import kruskal_mst_from_csr, _resolve_cl_params
 
     validate_precomputed_sparse_graph(X)
     n = X.shape[0]
@@ -526,17 +538,16 @@ def compute_mst_from_precomputed_sparse_kruskal(
         X_sym.data, X_sym.indices, X_sym.indptr, min_samples
     )
 
-    # 3. Validate CL constraints if provided.
-    cl_indices, cl_indptr = None, None
-    if cannot_link is not None:
-        cl_indices, cl_indptr = _validate_cannot_link(
-            cannot_link, n, validate=validate_cannot_link
-        )
+    # 3. Resolve CL constraints (pairwise or group-label, mutually exclusive).
+    cl = _resolve_cl_params(
+        n, cannot_link=cannot_link,
+        validate_cannot_link=validate_cannot_link,
+        cannot_link_groups=cannot_link_groups,
+    )
 
     # 4. Kruskal MST (float64 throughout — no patching needed).
     n_components, component_labels, mst_edges = kruskal_mst_from_csr(
-        X_sym.data, X_sym.indices, X_sym.indptr, core_distances,
-        cl_indices=cl_indices, cl_indptr=cl_indptr,
+        X_sym.data, X_sym.indices, X_sym.indptr, core_distances, cl=cl,
     )
 
     # 5. Bridge disconnected components with +inf edges.
