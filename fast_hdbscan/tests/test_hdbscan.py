@@ -2,6 +2,7 @@
 Tests for HDBSCAN clustering algorithm
 Shamelessly based on (i.e. ripped off from) the DBSCAN test code
 """
+
 import numpy as np
 from scipy.spatial import distance
 from scipy import sparse
@@ -81,7 +82,9 @@ def homogeneity(labels1, labels2):
 
 
 def test_hdbscan_feature_vector():
-    labels, p, ltree, ctree, mtree, neighbors, cdists = fast_hdbscan(X, return_trees=True)
+    labels, p, ltree, ctree, mtree, neighbors, cdists = fast_hdbscan(
+        X, return_trees=True
+    )
     n_clusters_1 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_1 == n_clusters
 
@@ -94,11 +97,11 @@ def test_hdbscan_dbscan_clustering():
     clusterer = HDBSCAN().fit(X)
     labels = clusterer.dbscan_clustering(0.3)
     n_clusters_1 = len(set(labels)) - int(-1 in labels)
-    assert(n_clusters == n_clusters_1)
+    assert n_clusters == n_clusters_1
 
 
 def test_hdbscan_no_clusters():
-    labels, p= fast_hdbscan(X, min_cluster_size=len(X) + 1)
+    labels, p = fast_hdbscan(X, min_cluster_size=len(X) + 1)
     n_clusters_1 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_1 == 0
 
@@ -116,9 +119,7 @@ def test_hdbscan_sample_weight():
 
 def test_hdbscan_min_cluster_size():
     for min_cluster_size in range(2, len(X) + 1, 1):
-        labels, p = fast_hdbscan(
-            X, min_cluster_size=min_cluster_size
-        )
+        labels, p = fast_hdbscan(X, min_cluster_size=min_cluster_size)
         true_labels = [label for label in labels if label != -1]
         if len(true_labels) != 0:
             assert np.min(np.bincount(true_labels)) >= min_cluster_size
@@ -135,33 +136,33 @@ def test_hdbscan_input_lists():
 
 
 def test_hdbscan_badargs():
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan("fail")
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(None)
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, min_cluster_size="fail")
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, min_samples="fail")
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, min_samples=-1)
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, cluster_selection_epsilon="fail")
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, cluster_selection_epsilon=-1)
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, cluster_selection_epsilon=-0.1)
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, cluster_selection_persistence="fail")
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, cluster_selection_persistence=1)
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, cluster_selection_persistence=-0.1)
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, cluster_selection_method="fail")
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, semi_supervised=True, ss_algorithm="fail")
-    with pytest.raises(ValueError): 
+    with pytest.raises(ValueError):
         fast_hdbscan(X, semi_supervised=True, data_labels=None)
 
 
@@ -179,13 +180,11 @@ def test_hdbscan_allow_single_cluster_with_epsilon():
 
     # An epsilon of 0.2 will produce 2 noise points and 2 labels
     # Allow single cluster does not prevent applying the epsilon threshold.
-    c = HDBSCAN(
-        min_cluster_size=5,
-        cluster_selection_epsilon=0.2
-    ).fit(no_structure)
+    c = HDBSCAN(min_cluster_size=5, cluster_selection_epsilon=0.2).fit(no_structure)
     unique_labels, counts = np.unique(c.labels_, return_counts=True)
     assert len(unique_labels) == 2
     assert counts[unique_labels == -1] == 2
+
 
 def test_hdbscan_max_cluster_size():
     model = HDBSCAN(max_cluster_size=30).fit(X)
@@ -207,21 +206,17 @@ def test_hdbscan_persistence_threshold():
 def test_mst_entry():
     # Assumes default keyword arguments match between class and function
     model = HDBSCAN(min_cluster_size=5).fit(X)
-    (
-        labels, 
-        probabilities, 
-        linkage_tree, 
-        condensed_tree, 
-        sorted_mst
-    ) = clusters_from_spanning_tree(model._min_spanning_tree, min_cluster_size=5)
+    (labels, probabilities, linkage_tree, condensed_tree, sorted_mst) = (
+        clusters_from_spanning_tree(model._min_spanning_tree, min_cluster_size=5)
+    )
     assert np.all(model.labels_ == labels)
     assert np.allclose(model.probabilities_, probabilities)
     assert np.allclose(model._min_spanning_tree, sorted_mst)
     assert np.allclose(model._single_linkage_tree, linkage_tree)
-    assert np.allclose(model._condensed_tree['parent'], condensed_tree.parent)
-    assert np.allclose(model._condensed_tree['child'], condensed_tree.child)
-    assert np.allclose(model._condensed_tree['lambda_val'], condensed_tree.lambda_val)
-    assert np.allclose(model._condensed_tree['child_size'], condensed_tree.child_size)
+    assert np.allclose(model._condensed_tree["parent"], condensed_tree.parent)
+    assert np.allclose(model._condensed_tree["child"], condensed_tree.child)
+    assert np.allclose(model._condensed_tree["lambda_val"], condensed_tree.lambda_val)
+    assert np.allclose(model._condensed_tree["child_size"], condensed_tree.child_size)
 
 
 # Disable for now -- need to refactor to meet newer standards
@@ -260,9 +255,7 @@ def _make_simple_sparse_graph(n=8, seed=42):
         rows += [i, j]
         cols += [j, i]
         data += [w, w]
-    return sparse.csr_matrix(
-        (data, (rows, cols)), shape=(n, n), dtype=np.float64
-    )
+    return sparse.csr_matrix((data, (rows, cols)), shape=(n, n), dtype=np.float64)
 
 
 def test_hdbscan_precomputed_sparse_basic_fit():
@@ -311,14 +304,13 @@ def test_precomputed_asymmetric_min_symmetrization():
     mst, _, _ = compute_minimum_spanning_tree(G, min_samples=1, metric="precomputed")
     assert mst.shape == (2, 3)
     # Edge (0,1) should have weight min(5.0, 1.0) = 1.0 (possibly inflated by core dist)
-    edge_01_mask = (
-        ((mst[:, 0] == 0) & (mst[:, 1] == 1)) |
-        ((mst[:, 0] == 1) & (mst[:, 1] == 0))
+    edge_01_mask = ((mst[:, 0] == 0) & (mst[:, 1] == 1)) | (
+        (mst[:, 0] == 1) & (mst[:, 1] == 0)
     )
     assert edge_01_mask.any(), "Edge (0,1) must be in MST"
-    assert mst[edge_01_mask, 2][0] == pytest.approx(1.0), (
-        "Edge (0,1) weight should be min(5.0, 1.0) = 1.0"
-    )
+    assert mst[edge_01_mask, 2][0] == pytest.approx(
+        1.0
+    ), "Edge (0,1) weight should be min(5.0, 1.0) = 1.0"
 
 
 def test_precomputed_disconnected_autobridge_inf():
@@ -460,13 +452,19 @@ def test_subcluster_rejects_precomputed_clusterer():
 
 
 def test_plscan_rejects_sparse_input():
-    """PLSCAN must raise ValueError for sparse input."""
+    """PLSCAN must raise ValueError for sparse input when metric is not precomputed."""
     from fast_hdbscan import PLSCAN
 
     G = _make_simple_sparse_graph(n=20)
     plscan = PLSCAN()
     with pytest.raises(ValueError, match="dense"):
         plscan.fit_predict(G)
+
+    # But sparse should be accepted with metric='precomputed'
+    plscan_precomputed = PLSCAN(metric="precomputed")
+    plscan_precomputed.fit_predict(G)
+    assert hasattr(plscan_precomputed, "labels_")
+    assert len(plscan_precomputed.labels_) == 20
 
 
 # -----------------------------------------------------------------------
@@ -495,8 +493,8 @@ def _make_full_pairwise_sparse(X):
     Returns a symmetric CSR matrix storing all n*(n-1) directed distances.
     """
     X32 = X.astype(np.float32)
-    D = distance.cdist(X32, X32)   # float64 from float32 inputs
-    np.fill_diagonal(D, 0.0)       # self-loops → 0 → eliminated by CSR
+    D = distance.cdist(X32, X32)  # float64 from float32 inputs
+    np.fill_diagonal(D, 0.0)  # self-loops → 0 → eliminated by CSR
     return sparse.csr_matrix(D)
 
 
@@ -509,14 +507,14 @@ def _align_labels(ref, other):
     the same points (excluding noise, -1, on either side), then pick the most
     frequent ``ref`` label as the canonical mapping for ``o``.  Finally apply
     the mapping element-wise; unmapped ids (e.g. noise) are passed through.
-    
+
     Parameters
     ----------
     ref : array-like of shape (n_samples,)
         Reference cluster labels to align to.
     other : array-like of shape (n_samples,)
         Cluster labels to align.
-    
+
     Returns
     -------
     aligned : ndarray of shape (n_samples,)
@@ -555,9 +553,9 @@ def _assert_label_parity(X, G, msg_ctx="", **hdbscan_kwargs):
 
     eu_n = len(set(eu.labels_) - {-1})
     pre_n = len(set(pre.labels_) - {-1})
-    assert eu_n == pre_n, (
-        f"Cluster count mismatch {msg_ctx}: euclidean={eu_n}, precomputed={pre_n}"
-    )
+    assert (
+        eu_n == pre_n
+    ), f"Cluster count mismatch {msg_ctx}: euclidean={eu_n}, precomputed={pre_n}"
 
     aligned = _align_labels(eu.labels_, pre.labels_)
     assert np.array_equal(eu.labels_, aligned), (
@@ -591,13 +589,15 @@ _PARITY_DATASETS = {
 
 # ── Parametrised parity tests ─────────────────────────────────────────────────
 
+
 @pytest.mark.parametrize("dataset", ["blobs", "moons"])
 @pytest.mark.parametrize("min_samples", [1, 5, 10])
 def test_parity_labels_min_samples(dataset, min_samples):
     """Exact label parity for multiple min_samples values on two dataset types."""
     X, G = _PARITY_DATASETS[dataset]
     _assert_label_parity(
-        X, G,
+        X,
+        G,
         msg_ctx=f"dataset={dataset} min_samples={min_samples}",
         min_cluster_size=10,
         min_samples=min_samples,
@@ -610,7 +610,8 @@ def test_parity_min_cluster_size_sweep(dataset, mcs):
     """Exact label parity across min_cluster_size values on two dataset types."""
     X, G = _PARITY_DATASETS[dataset]
     _assert_label_parity(
-        X, G,
+        X,
+        G,
         msg_ctx=f"dataset={dataset} min_cluster_size={mcs}",
         min_cluster_size=mcs,
     )
@@ -632,7 +633,8 @@ def test_parity_allow_single_cluster(dataset):
     """allow_single_cluster=True produces identical results on both paths."""
     X, G = _PARITY_DATASETS[dataset]
     _assert_label_parity(
-        X, G,
+        X,
+        G,
         msg_ctx=f"dataset={dataset}",
         min_cluster_size=5,
         allow_single_cluster=True,
@@ -652,7 +654,8 @@ def test_parity_leaf_selection_method():
     """
     X, G = _PARITY_DATASETS["blobs"]
     _assert_label_parity(
-        X, G,
+        X,
+        G,
         msg_ctx="dataset=blobs",
         min_cluster_size=5,
         cluster_selection_method="leaf",
@@ -682,7 +685,8 @@ def test_parity_mst_edge_count_and_approx_weights():
     np.testing.assert_allclose(
         np.sort(eu_mst[:, 2]),
         np.sort(pre_mst[:, 2]),
-        rtol=1e-3, atol=1e-4,
+        rtol=1e-3,
+        atol=1e-4,
         err_msg="MST sorted weights differ beyond float32 epsilon",
     )
 
@@ -704,7 +708,8 @@ def test_parity_probabilities_match():
     np.testing.assert_allclose(
         eu.probabilities_[matched],
         pre.probabilities_[matched],
-        rtol=1e-2, atol=1e-3,
+        rtol=1e-2,
+        atol=1e-3,
         err_msg="Membership probabilities differ beyond tolerance",
     )
 
@@ -726,7 +731,8 @@ def test_parity_epsilon_selection(dataset):
     """cluster_selection_epsilon threshold is applied identically on both paths."""
     X, G = _PARITY_DATASETS[dataset]
     _assert_label_parity(
-        X, G,
+        X,
+        G,
         msg_ctx=f"dataset={dataset}",
         min_cluster_size=5,
         cluster_selection_epsilon=0.5,

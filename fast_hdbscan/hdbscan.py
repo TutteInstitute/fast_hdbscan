@@ -693,6 +693,12 @@ class PLSCAN(ClusterMixin, BaseEstimator):
         base_n_clusters: Optional[int] = None,
         layer_similarity_threshold: float = 0.2,
         reproducible: bool = False,
+        metric: str = "euclidean",
+        algorithm: str = "boruvka",
+        knn_k: Optional[int] = None,
+        cannot_link=None,
+        validate_cannot_link: bool = True,
+        metric_kwds: Optional[dict] = None,
         verbose=False,
     ):
         self.min_samples = min_samples
@@ -701,6 +707,12 @@ class PLSCAN(ClusterMixin, BaseEstimator):
         self.base_n_clusters = base_n_clusters
         self.layer_similarity_threshold = layer_similarity_threshold
         self.reproducible = reproducible
+        self.metric = metric
+        self.algorithm = algorithm
+        self.knn_k = knn_k
+        self.cannot_link = cannot_link
+        self.validate_cannot_link = validate_cannot_link
+        self.metric_kwds = metric_kwds
         self.verbose = verbose
 
         self._validate_params()
@@ -727,20 +739,60 @@ class PLSCAN(ClusterMixin, BaseEstimator):
             ) or self.base_n_clusters <= 0:
                 raise ValueError("Base n clusters must be a positive integer!")
 
+        if self.algorithm not in ("boruvka", "kruskal"):
+            raise ValueError(
+                "algorithm must be 'boruvka' or 'kruskal'. Got: %s" % self.algorithm
+            )
+
+        if self.cannot_link is not None and self.algorithm != "kruskal":
+            raise ValueError(
+                "cannot_link constraints are only supported with "
+                "algorithm='kruskal'. Got algorithm=%r." % self.algorithm
+            )
+
     def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
         import scipy.sparse
 
-        if scipy.sparse.issparse(X):
-            raise ValueError(
-                "PLSCAN requires a dense feature matrix. "
-                "Sparse matrices and precomputed distance graphs are not supported. "
-                "Use HDBSCAN(metric='precomputed') for sparse precomputed graphs."
-            )
-        X = validate_data(self, X, accept_sparse="csr", ensure_all_finite=False)
-        self._raw_data = X
+        if self.metric == "precomputed":
+            from .precomputed import validate_precomputed_sparse_graph
 
-        if sample_weight is not None:
-            sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
+            validate_precomputed_sparse_graph(X)
+            if sample_weight is not None:
+                raise NotImplementedError(
+                    "sample_weights is not supported with metric='precomputed'."
+                )
+            self._raw_data = None
+        elif self.metric != "euclidean":
+            from .nndescent import _check_pynndescent_available
+
+            _check_pynndescent_available()
+            if scipy.sparse.issparse(X):
+                raise ValueError(
+                    "PLSCAN requires a dense feature matrix for metric=%r. "
+                    "Sparse matrices are only supported with "
+                    "metric='precomputed'." % self.metric
+                )
+            X = validate_data(self, X, accept_sparse=False, ensure_all_finite=False)
+            self._raw_data = X
+            if sample_weight is not None:
+                sample_weight = _check_sample_weight(
+                    sample_weight, X, dtype=np.float32
+                )
+        else:
+            if scipy.sparse.issparse(X):
+                raise ValueError(
+                    "PLSCAN requires a dense feature matrix for metric='euclidean'. "
+                    "Sparse matrices are only supported with "
+                    "metric='precomputed'."
+                )
+            X = validate_data(
+                self, X, accept_sparse=False, ensure_all_finite=False
+            )
+            self._raw_data = X
+            if sample_weight is not None:
+                sample_weight = _check_sample_weight(
+                    sample_weight, X, dtype=np.float32
+                )
 
         kwargs = self.get_params()
 
