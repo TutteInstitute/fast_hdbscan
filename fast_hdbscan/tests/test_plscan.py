@@ -49,10 +49,10 @@ def test_plscan_max_layers():
 
 
 def test_plscan_layer_similarity_threshold():
-    # Lower threshold should allow more layers
+    # Higher threshold should allow more layers
     model_low = PLSCAN(layer_similarity_threshold=0.01, max_layers=5).fit(X)
     model_high = PLSCAN(layer_similarity_threshold=0.9, max_layers=5).fit(X)
-    assert len(model_low.cluster_layers_) >= len(model_high.cluster_layers_)
+    assert len(model_low.cluster_layers_) <= len(model_high.cluster_layers_)
 
 
 def test_plscan_reproducibility():
