@@ -689,7 +689,7 @@ class PLSCAN(ClusterMixin, BaseEstimator):
         *,
         min_samples: int = 5,
         max_layers: int = 10,
-        base_min_cluster_size: int = 10,
+        base_min_cluster_size: int = 5,
         base_n_clusters: Optional[int] = None,
         layer_similarity_threshold: float = 0.2,
         reproducible: bool = False,

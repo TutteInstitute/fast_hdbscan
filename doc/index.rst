@@ -90,6 +90,8 @@ User Guide
    :caption: Contents:
 
    basic_usage
+   plscan
+   metrics_and_constraints
    benchmarks
    comparable_clusterings
    detecting_branches
