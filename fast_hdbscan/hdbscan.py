@@ -683,13 +683,130 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
 
 
 class PLSCAN(ClusterMixin, BaseEstimator):
+    """Perform PLSCAN clustering for automated multi-resolution cluster analysis.
+
+    PLSCAN automatically discovers meaningful clustering resolutions from data
+    by analysing the persistence landscape of the HDBSCAN cluster hierarchy.
+    It produces multiple *cluster layers*, each representing the data at a
+    different resolution, and selects the most persistent layer as the primary
+    labelling.
+
+    See `Persistent Multiscale Density-based Clustering <https://arxiv.org/abs/2512.16558>`_ for algorithmic details.
+
+    Parameters
+    ----------
+    min_samples : int, default=5
+        The number of samples in a neighbourhood for a point to be considered
+        a core point.  This controls the level of smoothing applied to the
+        density estimate.
+
+    max_layers : int, default=10
+        Maximum number of cluster resolution layers to return (including the
+        base layer).
+
+    base_min_cluster_size : int, default=5
+        The minimum cluster size used when constructing the initial condensed
+        tree.  Clusters smaller than this are treated as noise.
+
+    base_n_clusters : int or None, default=None
+        If set, the base layer is constructed by binary-searching for a
+        ``min_cluster_size`` that yields approximately this many clusters.
+        When ``None``, ``base_min_cluster_size`` is used directly.
+
+    layer_similarity_threshold : float, default=0.2
+        Minimum dissimilarity between selected resolution layers.  Lower
+        values produce more diverse layers; higher values allow more similar
+        layers to coexist.
+
+    reproducible : bool, default=False
+        If ``True``, use a slower but deterministic algorithm for the
+        minimum spanning tree computation so that results are reproducible
+        across runs.
+
+    metric : str, default='euclidean'
+        The distance metric to use.  ``'euclidean'`` uses a fast KD-tree
+        implementation.  ``'precomputed'`` expects a sparse distance graph
+        as input.  Any other metric supported by ``pynndescent`` may be
+        used, but requires ``pynndescent`` to be installed.
+
+    algorithm : str, default='boruvka'
+        The MST algorithm to use.  Must be ``'boruvka'`` or ``'kruskal'``.
+        ``'kruskal'`` is required when using ``cannot_link`` constraints.
+
+    knn_k : int or None, default=None
+        Number of nearest neighbours to compute when building the MST.
+        When ``None``, a suitable default is chosen automatically.
+
+    cannot_link : array-like or None, default=None
+        An array of pairs ``(i, j)`` of sample indices that must not be
+        placed in the same cluster.  Only supported with
+        ``algorithm='kruskal'``.
+
+    validate_cannot_link : bool, default=True
+        Whether to validate ``cannot_link`` constraints before clustering.
+
+    metric_kwds : dict or None, default=None
+        Additional keyword arguments to pass to the distance metric.
+
+    verbose : bool, default=False
+        If ``True``, print progress messages during fitting.
+
+    Attributes
+    ----------
+    labels_ : ndarray of shape (n_samples,)
+        Cluster labels for each point in the dataset.  Noisy samples are
+        given the label -1.  Corresponds to the layer with the highest
+        persistence score.
+
+    membership_strengths_ : ndarray of shape (n_samples,)
+        Cluster membership strength for each sample in ``labels_``.
+
+    cluster_layers_ : list of ndarray
+        List of label arrays, one per discovered resolution layer, sorted
+        by number of clusters in descending order.
+
+    membership_strength_layers_ : list of ndarray
+        Membership strengths corresponding to each entry in
+        ``cluster_layers_``.
+
+    layer_persistence_scores_ : list of float
+        Persistence score for each layer.  The layer with the highest score
+        is used as the primary labelling.
+
+    min_cluster_sizes_ : ndarray
+        The ``min_cluster_size`` values explored during the persistence
+        landscape analysis.
+
+    total_persistence_ : ndarray
+        Total persistence values across the ``min_cluster_size`` range.
+
+    cluster_tree_ : dict
+        Hierarchical tree relating clusters across layers.  Keys are
+        ``(layer, cluster_id)`` tuples representing parent clusters; values
+        are lists of ``(layer, cluster_id)`` child tuples.
+
+    Examples
+    --------
+    >>> import fast_hdbscan
+    >>> from sklearn.datasets import make_blobs
+    >>> data, _ = make_blobs(1000, random_state=42)
+    >>> clusterer = fast_hdbscan.PLSCAN()
+    >>> labels = clusterer.fit_predict(data)
+    >>> len(clusterer.cluster_layers_)  # number of resolution layers found
+    1
+
+    References
+    ----------
+    .. [1] Daniël Bot, Leland McInnes, Jan Aerts (2025). "Persistent Multiscale Density-based Clustering."
+       arXiv:2512.16558.
+    """
 
     def __init__(
         self,
         *,
         min_samples: int = 5,
         max_layers: int = 10,
-        base_min_cluster_size: int = 10,
+        base_min_cluster_size: int = 5,
         base_n_clusters: Optional[int] = None,
         layer_similarity_threshold: float = 0.2,
         reproducible: bool = False,
@@ -751,6 +868,30 @@ class PLSCAN(ClusterMixin, BaseEstimator):
             )
 
     def fit_predict(self, X, y=None, sample_weight=None, **fit_params):
+        """Fit the model and return cluster labels.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features), or sparse graph
+            Training data.  When ``metric='precomputed'``, ``X`` should be
+            a sparse distance graph.
+
+        y : ignored
+            Not used, present for API consistency.
+
+        sample_weight : array-like of shape (n_samples,) or None, default=None
+            Weights for each sample.  Not supported with
+            ``metric='precomputed'``.
+
+        **fit_params : dict
+            Additional fitting parameters (unused).
+
+        Returns
+        -------
+        labels : ndarray of shape (n_samples,)
+            Cluster labels for the layer with the highest persistence
+            score.  Noisy samples are labelled -1.
+        """
         import scipy.sparse
 
         if self.metric == "precomputed":
@@ -775,9 +916,7 @@ class PLSCAN(ClusterMixin, BaseEstimator):
             X = validate_data(self, X, accept_sparse=False, ensure_all_finite=False)
             self._raw_data = X
             if sample_weight is not None:
-                sample_weight = _check_sample_weight(
-                    sample_weight, X, dtype=np.float32
-                )
+                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
         else:
             if scipy.sparse.issparse(X):
                 raise ValueError(
@@ -785,14 +924,10 @@ class PLSCAN(ClusterMixin, BaseEstimator):
                     "Sparse matrices are only supported with "
                     "metric='precomputed'."
                 )
-            X = validate_data(
-                self, X, accept_sparse=False, ensure_all_finite=False
-            )
+            X = validate_data(self, X, accept_sparse=False, ensure_all_finite=False)
             self._raw_data = X
             if sample_weight is not None:
-                sample_weight = _check_sample_weight(
-                    sample_weight, X, dtype=np.float32
-                )
+                sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float32)
 
         kwargs = self.get_params()
 
@@ -820,5 +955,28 @@ class PLSCAN(ClusterMixin, BaseEstimator):
         return self.labels_
 
     def fit(self, X, y=None, sample_weight=None, **fit_params):
+        """Fit the PLSCAN model.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features), or sparse graph
+            Training data.  When ``metric='precomputed'``, ``X`` should be
+            a sparse distance graph.
+
+        y : ignored
+            Not used, present for API consistency.
+
+        sample_weight : array-like of shape (n_samples,) or None, default=None
+            Weights for each sample.  Not supported with
+            ``metric='precomputed'``.
+
+        **fit_params : dict
+            Additional fitting parameters (unused).
+
+        Returns
+        -------
+        self : PLSCAN
+            The fitted estimator.
+        """
         _ = self.fit_predict(X, y=y, sample_weight=sample_weight, **fit_params)
         return self
