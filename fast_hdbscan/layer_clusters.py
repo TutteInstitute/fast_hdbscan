@@ -156,11 +156,15 @@ def binary_search_for_n_clusters(
     reproducible=False,
 ):
     numba_tree = build_kdtree(data.astype(np.float32))
-    edges = parallel_boruvka(
+    edges, _, _ = parallel_boruvka(
         numba_tree,
         n_threads,
         min_samples=min_samples,
-        sample_weights=sample_weights,
+        sample_weights=(
+            sample_weights
+            if sample_weights is not None
+            else np.zeros(1, dtype=np.float32)
+        ),
         reproducible=reproducible,
     )
     sorted_mst = edges[np.argsort(edges.T[2])]

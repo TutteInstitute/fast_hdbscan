@@ -3,6 +3,7 @@ import numpy as np
 
 from .disjoint_set import ds_rank_create, ds_find, ds_union_by_rank
 from .numba_kdtree import (
+    NumbaKDTreeType,
     parallel_tree_query,
     rdist,
     point_to_node_lower_bound_rdist,
@@ -124,6 +125,20 @@ def update_component_vectors(tree, disjoint_set, node_components, point_componen
 
 
 @numba.njit(
+    numba.void(
+        NumbaKDTreeType,
+        numba.int32,
+        numba.float32[::1],
+        numba.float32[::1],
+        numba.int32[::1],
+        numba.float32,
+        numba.types.Array(numba.float32, 1, "A"),
+        numba.int64,
+        numba.int64[::1],
+        numba.int64[::1],
+        numba.float32,
+        numba.float32[::1],
+    ),
     locals={
         "i": numba.types.int32,
         "idx": numba.types.int32,
@@ -200,8 +215,8 @@ def component_aware_query_recursion(
     # Case 3: Node is not a leaf.  Recursively query subnodes
     #         starting with the closest
     else:
-        left = 2 * node + 1
-        right = left + 1
+        left = numba.int32(2 * node + 1)
+        right = numba.int32(left + 1)
         dist_lower_bound_left = point_to_node_lower_bound_rdist(
             tree.node_bounds[0, left], tree.node_bounds[1, left], point
         )
@@ -298,7 +313,7 @@ def boruvka_tree_query(tree, node_components, point_components, core_distances):
         heap_p, heap_i = candidate_distances[i : i + 1], candidate_indices[i : i + 1]
         component_aware_query_recursion(
             tree,
-            0,
+            numba.int32(0),
             data[i],
             heap_p,
             heap_i,
@@ -368,6 +383,13 @@ def update_component_bounds_from_block(
 
 
 @numba.njit(
+    numba.types.Tuple((numba.float32[::1], numba.int32[::1]))(
+        NumbaKDTreeType,
+        numba.int64[::1],
+        numba.int64[::1],
+        numba.types.Array(numba.float32, 1, "A"),
+        numba.int64,
+    ),
     locals={
         "block_start": numba.types.int32,
         "block_end": numba.types.int32,
@@ -421,7 +443,7 @@ def boruvka_tree_query_reproducible(
 
             component_aware_query_recursion(
                 tree,
-                0,
+                numba.int32(0),
                 data[i],
                 heap_p,
                 heap_i,
@@ -517,16 +539,29 @@ def sample_weight_core_distance(distances, neighbors, sample_weights, min_sample
     return core_distances
 
 
-@numba.njit(cache=NUMBA_CACHE)
+@numba.njit(
+    numba.types.Tuple((numba.float64[:, ::1], numba.int32[:, :], numba.float32[::1]))(
+        NumbaKDTreeType,
+        numba.int64,
+        numba.int64,
+        numba.float32[::1],
+        numba.types.boolean,
+    ),
+    cache=NUMBA_CACHE,
+)
 def parallel_boruvka(
-    tree, n_threads, min_samples=10, sample_weights=None, reproducible=False
+    tree,
+    n_threads,
+    min_samples=10,
+    sample_weights=np.zeros(1, dtype=np.float32),
+    reproducible=False,
 ):
     components_disjoint_set = ds_rank_create(tree.data.shape[0])
     point_components = np.arange(tree.data.shape[0])
     node_components = np.full(tree.idx_start.shape[0], -1)
     n_components = point_components.shape[0]
 
-    if sample_weights is not None:
+    if sample_weights.shape[0] > 1:
         mean_sample_weight = np.mean(sample_weights)
         expected_neighbors = min_samples / mean_sample_weight
         distances, neighbors = parallel_tree_query(

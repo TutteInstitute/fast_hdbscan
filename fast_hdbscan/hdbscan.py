@@ -388,7 +388,11 @@ def compute_minimum_spanning_tree(
             numba_tree,
             n_threads,
             min_samples=min_samples,
-            sample_weights=sample_weights,
+            sample_weights=(
+                sample_weights
+                if sample_weights is not None
+                else np.empty(1, dtype=np.float32)
+            ),
             reproducible=reproducible,
         )
         return edges, neighbors, core_distances
