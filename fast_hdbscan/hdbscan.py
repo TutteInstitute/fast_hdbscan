@@ -354,7 +354,13 @@ def compute_minimum_spanning_tree(
 
             return compute_mst_from_precomputed_sparse(data, min_samples)
 
-    if metric not in ("euclidean", "precomputed") or data.shape[1] > 30:
+    if metric not in ("euclidean", "precomputed") or (
+        data.shape[1] > 30 and sample_weights is None
+    ):
+        if sample_weights is not None:
+            raise NotImplementedError(
+                "sample_weights is not supported for non-euclidean metrics at this time."
+            )
         # Arbitrary metric — delegate to pynndescent KNN graph path
         from .nndescent import compute_mst_from_knn_graph
 
