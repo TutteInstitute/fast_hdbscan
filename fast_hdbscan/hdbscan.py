@@ -1,11 +1,12 @@
 import numpy as np
 import numba
+import numbers
 
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.utils import check_array, check_X_y
 from sklearn.utils.validation import (
     check_is_fitted,
-    _check_sample_weight,
+    check_non_negative,
     validate_data,
 )
 from sklearn.neighbors import KDTree
@@ -37,6 +38,56 @@ try:
     _HAVE_HDBSCAN = True
 except ImportError:
     _HAVE_HDBSCAN = False
+
+
+# Simplified version of sklearn's check_sample_weight
+def _check_sample_weight(
+    sample_weight,
+    X,
+    dtype,
+    *,
+    ensure_non_negative=False,
+    copy=False,
+    allow_all_zero_weights=False,
+):
+    n_samples = X.shape[0]
+
+    if isinstance(sample_weight, numbers.Number):
+        sample_weight = np.full(n_samples, sample_weight, dtype=dtype)
+    else:
+        sample_weight = check_array(
+            sample_weight,
+            accept_sparse=False,
+            ensure_2d=False,
+            dtype=dtype,
+            order="C",
+            copy=copy,
+            input_name="sample_weight",
+        )
+        if sample_weight.ndim != 1:
+            raise ValueError(
+                f"Sample weights must be 1D array or scalar, got "
+                f"{sample_weight.ndim}D array. Expected either a scalar value "
+                f"or a 1D array of length {n_samples}."
+            )
+
+        if sample_weight.shape != (n_samples,):
+            raise ValueError(
+                "sample_weight.shape == {}, expected {}!".format(
+                    sample_weight.shape, (n_samples,)
+                )
+            )
+
+    if not allow_all_zero_weights:
+        if np.all(sample_weight == 0):
+            raise ValueError(
+                "Sample weights must contain at least one non-zero number."
+            )
+
+    if ensure_non_negative:
+        check_non_negative(sample_weight, "`sample_weight`")
+
+    return sample_weight
 
 
 def to_numpy_rec_array(named_tuple_tree):
@@ -174,6 +225,10 @@ def fast_hdbscan(
         # Validation is deferred to compute_minimum_spanning_tree -> precomputed module
     elif metric == "euclidean":
         data = check_array(data)
+        if sample_weights is not None:
+            sample_weights = _check_sample_weight(
+                sample_weights, data, dtype=np.float32
+            )
     else:
         # Arbitrary metric — requires pynndescent
         from .nndescent import _check_pynndescent_available
