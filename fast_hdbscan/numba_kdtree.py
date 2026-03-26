@@ -5,7 +5,7 @@ from collections import namedtuple
 from .variables import NUMBA_CACHE
 
 NumbaKDTree = namedtuple(
-    "KDTree",
+    "NumbaKDTree",
     ["data", "idx_array", "idx_start", "idx_end", "radius", "is_leaf", "node_bounds"],
 )
 NodeData = namedtuple("NodeData", ["idx_start", "idx_end", "radius", "is_leaf"])
@@ -660,6 +660,14 @@ def deheap_sort(distances, indices):
 
 
 @numba.njit(
+    numba.void(
+        NumbaKDTreeType,
+        numba.types.intp,
+        numba.float32[::1],
+        numba.float32[::1],
+        numba.int32[::1],
+        numba.float32,
+    ),
     fastmath=True,
     locals={
         "node": numba.types.intp,
