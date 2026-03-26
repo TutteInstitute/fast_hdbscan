@@ -145,7 +145,7 @@ def _binary_search_for_n_clusters(uncondensed_tree, approx_n_clusters, n_samples
             return upper_leaves, upper_clusters, strengths
 
 
-@numba.njit(cache=NUMBA_CACHE)
+# @numba.njit(cache=NUMBA_CACHE)
 def binary_search_for_n_clusters(
     data,
     approx_n_clusters,
