@@ -35,15 +35,27 @@ NumbaKDTreeType = numba.types.NamedTuple(
 
 def kdtree_to_numba(sklearn_kdtree):
     data, idx_array, node_data, node_bounds = sklearn_kdtree.get_arrays()
-    return NumbaKDTree(
-        data,
-        idx_array,
-        node_data.idx_start,
-        node_data.idx_end,
-        node_data.radius,
-        node_data.is_leaf,
-        node_bounds,
-    )
+    try:
+        return NumbaKDTree(
+            data,
+            idx_array,
+            node_data.idx_start,
+            node_data.idx_end,
+            node_data.radius,
+            node_data.is_leaf,
+            node_bounds,
+        )
+    except AttributeError:
+        # For older versions of sklearn, node_data is a tuple of arrays rather than a named tuple
+        return NumbaKDTree(
+            data,
+            idx_array,
+            node_data["idx_start"],
+            node_data["idx_end"],
+            node_data["radius"],
+            node_data["is_leaf"],
+            node_bounds,
+        )
 
 
 @numba.njit(
