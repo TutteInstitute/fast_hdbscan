@@ -91,6 +91,12 @@ def _check_sample_weight(
 
 
 def to_numpy_rec_array(named_tuple_tree):
+    # If already a structured numpy array (e.g. from degenerate input), return as-is
+    if (
+        isinstance(named_tuple_tree, np.ndarray)
+        and named_tuple_tree.dtype.names is not None
+    ):
+        return named_tuple_tree
     size = named_tuple_tree.parent.shape[0]
     result = np.empty(
         size,
@@ -267,6 +273,35 @@ def fast_hdbscan(
         raise ValueError(
             "Cluster selection persistence must be a positive floating point number!"
         )
+
+    # Handle degenerate case: single point cannot form any cluster
+    if data.shape[0] < 2:
+        n = data.shape[0]
+        labels = np.full(n, -1, dtype=np.intp)
+        probabilities = np.zeros(n, dtype=np.float64)
+        single_linkage_tree = np.zeros((0, 4), dtype=np.float64)
+        condensed_tree = np.zeros(
+            0,
+            dtype=[
+                ("parent", np.intp),
+                ("child", np.intp),
+                ("lambda_val", np.float64),
+                ("child_size", np.intp),
+            ],
+        )
+        mst = np.zeros((0, 3), dtype=np.float64)
+        neighbors = np.zeros((n, 0), dtype=np.intp)
+        core_distances = np.full(n, np.inf, dtype=np.float64)
+        result = (
+            labels,
+            probabilities,
+            single_linkage_tree,
+            condensed_tree,
+            mst,
+            neighbors,
+            core_distances,
+        )
+        return result[: (None if return_trees else 2)]
 
     minimum_spanning_tree, neighbors, core_distances = compute_minimum_spanning_tree(
         data,
