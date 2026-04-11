@@ -35,27 +35,33 @@ NumbaKDTreeType = numba.types.NamedTuple(
 
 def kdtree_to_numba(sklearn_kdtree):
     data, idx_array, node_data, node_bounds = sklearn_kdtree.get_arrays()
-    try:
-        return NumbaKDTree(
-            data,
-            idx_array,
-            node_data.idx_start,
-            node_data.idx_end,
-            node_data.radius,
-            node_data.is_leaf,
-            node_bounds,
-        )
-    except AttributeError:
-        # For older versions of sklearn, node_data is a tuple of arrays rather than a named tuple
-        return NumbaKDTree(
-            data,
-            idx_array,
-            node_data["idx_start"],
-            node_data["idx_end"],
-            node_data["radius"],
-            node_data["is_leaf"],
-            node_bounds,
-        )
+
+    if (
+        hasattr(node_data, "dtype")
+        and hasattr(node_data.dtype, "names")
+        and node_data.dtype.names is not None
+    ):
+        # Structured array: access by field name (current sklearn versions)
+        idx_start = np.asarray(node_data["idx_start"], dtype=np.intp)
+        idx_end = np.asarray(node_data["idx_end"], dtype=np.intp)
+        radius = np.asarray(node_data["radius"], dtype=np.float32)
+        is_leaf = np.asarray(node_data["is_leaf"], dtype=np.bool_)
+    else:
+        # Named tuple or object with attributes (older sklearn versions)
+        idx_start = np.asarray(node_data.idx_start, dtype=np.intp)
+        idx_end = np.asarray(node_data.idx_end, dtype=np.intp)
+        radius = np.asarray(node_data.radius, dtype=np.float32)
+        is_leaf = np.asarray(node_data.is_leaf, dtype=np.bool_)
+
+    return NumbaKDTree(
+        data,
+        idx_array,
+        idx_start,
+        idx_end,
+        radius,
+        is_leaf,
+        node_bounds,
+    )
 
 
 @numba.njit(
