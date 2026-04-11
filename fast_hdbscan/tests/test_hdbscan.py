@@ -308,9 +308,9 @@ def test_precomputed_asymmetric_min_symmetrization():
         (mst[:, 0] == 1) & (mst[:, 1] == 0)
     )
     assert edge_01_mask.any(), "Edge (0,1) must be in MST"
-    assert mst[edge_01_mask, 2][0] == pytest.approx(
-        1.0
-    ), "Edge (0,1) weight should be min(5.0, 1.0) = 1.0"
+    assert mst[edge_01_mask, 2][0] == pytest.approx(1.0), (
+        "Edge (0,1) weight should be min(5.0, 1.0) = 1.0"
+    )
 
 
 def test_precomputed_disconnected_autobridge_inf():
@@ -553,9 +553,9 @@ def _assert_label_parity(X, G, msg_ctx="", **hdbscan_kwargs):
 
     eu_n = len(set(eu.labels_) - {-1})
     pre_n = len(set(pre.labels_) - {-1})
-    assert (
-        eu_n == pre_n
-    ), f"Cluster count mismatch {msg_ctx}: euclidean={eu_n}, precomputed={pre_n}"
+    assert eu_n == pre_n, (
+        f"Cluster count mismatch {msg_ctx}: euclidean={eu_n}, precomputed={pre_n}"
+    )
 
     aligned = _align_labels(eu.labels_, pre.labels_)
     assert np.array_equal(eu.labels_, aligned), (
@@ -737,3 +737,26 @@ def test_parity_epsilon_selection(dataset):
         min_cluster_size=5,
         cluster_selection_epsilon=0.5,
     )
+
+
+def test_issue_63_no_spurious_noise():
+    """Clusters should not be entirely labeled as noise for specific seeds.
+    Regression test for https://github.com/TutteInstitute/fast_hdbscan/issues/63
+    """
+    for seed in [700, 727]:
+        rng = np.random.default_rng(seed)
+        centers = rng.uniform(-10, 10, size=(3, 3))
+        data = np.vstack([rng.normal(loc=c, scale=0.5, size=(200, 3)) for c in centers])
+        clusterer = HDBSCAN(
+            min_cluster_size=192,
+            min_samples=1,
+            cluster_selection_epsilon=0.05957,
+            allow_single_cluster=True,
+        )
+        labels = clusterer.fit_predict(data)
+        n_clusters = len(set(labels) - {-1})
+        assert n_clusters >= 1, f"seed={seed}: all points labeled as noise"
+        noise_ratio = np.sum(labels == -1) / len(labels)
+        assert noise_ratio < 0.9, (
+            f"seed={seed}: {noise_ratio:.0%} noise, expected < 90%"
+        )
