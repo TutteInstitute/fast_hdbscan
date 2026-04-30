@@ -105,32 +105,16 @@ stages:
           condition: eq(variables['Agent.OS'], 'Darwin')
 
         - script: |
-            pip install --build-constraint constraints.txt -c constraints.txt -r requirements.txt
+            python -m pip install -U uv
+            uv sync --group cicd
           env:
             # Ensure that the LLVM_CONFIG environment variable is available during installation
             LLVM_CONFIG: $(LLVM_CONFIG)
             CMAKE_PREFIX_PATH: $(CMAKE_PREFIX_PATH)
-            # Keep build isolation constrained as well; this targets PEP517
-            # build dependencies (for example llvmlite's setuptools usage).
-            PIP_BUILD_CONSTRAINT: $(System.DefaultWorkingDirectory)/constraints.txt
-          displayName: 'Install dependencies'
-          condition: ${{ eq(parameters.includeReleaseCandidates, false) }}
+          displayName: 'Install package and dependencies'
 
         - script: |
-            pip install --pre --build-constraint constraints.txt -c constraints.txt -r requirements.txt
-          env:
-            PIP_BUILD_CONSTRAINT: $(System.DefaultWorkingDirectory)/constraints.txt
-          displayName: 'Install dependencies (allow pre-releases)'
-          condition: ${{ eq(parameters.includeReleaseCandidates, true) }}
-
-        - script: |
-            pip install -e .
-            pip install pytest  pytest-azurepipelines
-            pip install pytest-cov
-          displayName: 'Install package'
-
-        - script: |
-            pytest fast_hdbscan/tests --show-capture=no -v --disable-warnings --junitxml=junit/test-results.xml --cov=fast_hdbscan/ --cov-report=xml --cov-report=html
+            uv run pytest fast_hdbscan/tests --show-capture=no -v --disable-warnings --junitxml=junit/test-results.xml --cov=fast_hdbscan/ --cov-report=xml --cov-report=html
           displayName: 'Run tests'
 
         - task: PublishTestResults@2
@@ -150,28 +134,21 @@ stages:
         steps:
         - task: UsePythonVersion@0
           inputs:
-            versionSpec: '3.10'
-          displayName: 'Use Python 3.10'
+            versionSpec: '3.13'
+          displayName: 'Use Python 3.13'
 
         - script: |
             python -m pip install --upgrade pip
-            pip install wheel
-            pip install --build-constraint constraints.txt -c constraints.txt -r requirements.txt
-          env:
-            PIP_BUILD_CONSTRAINT: $(System.DefaultWorkingDirectory)/constraints.txt
+            python -m pip install -U uv
+            uv sync
           displayName: 'Install dependencies'
 
         - script: |
-            pip install -e .
-          displayName: 'Install package locally'
-        
-        - script: |
-            pip install build
-            python -m build --wheel --sdist --outdir dist/ .
+            uv build --no-sources --sdist --wheel
           displayName: 'Build package'
 
         - bash: |
-            export PACKAGE_VERSION="$(python setup.py --version)"
+            export PACKAGE_VERSION="$(uv version --short)"
             echo "Package Version: ${PACKAGE_VERSION}"
             echo "##vso[task.setvariable variable=packageVersionFormatted;]release-${PACKAGE_VERSION}"
           displayName: 'Get package version'
@@ -189,7 +166,7 @@ stages:
             secureFile: 'pypirc'  
 
         - script: |
-            pip install twine
-            twine upload --repository pypi --config-file $(PYPIRC_CONFIG.secureFilePath) dist/* 
+            uvx twine check dist/*
+            uvx twine upload --repository pypi --config-file $(PYPIRC_CONFIG.secureFilePath) dist/*
           displayName: 'Upload to PyPI'
           condition: and(succeeded(), eq(variables['Build.SourceBranchName'], variables['packageVersionFormatted']))
