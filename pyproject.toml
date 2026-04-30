@@ -32,6 +32,9 @@ Homepage = "https://github.com/TutteInstitute/fast_hdbscan"
 [project.optional-dependencies]
 nndescent = ["pynndescent>=0.6"]
 
+[dependency-groups]
+cicd = ["pytest", "pytest-azurepipelines", "pytest-cov"]
+
 [tool.setuptools]
 zip-safe = false
 packages = ["fast_hdbscan"]
