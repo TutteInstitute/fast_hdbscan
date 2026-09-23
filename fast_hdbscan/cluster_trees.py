@@ -146,6 +146,17 @@ def bfs_from_hierarchy(hierarchy, bfs_root, num_points):
 
 
 @numba.njit(cache=NUMBA_CACHE)
+def emit_point(
+    parents, children, lambdas, sizes, idx, parent_node, point, lambda_value, sample_weights
+):
+    parents[idx] = parent_node
+    children[idx] = point
+    lambdas[idx] = lambda_value
+    sizes[idx] = sample_weights[point]
+    return idx + 1
+
+
+@numba.njit(cache=NUMBA_CACHE)
 def eliminate_branch(
     branch_node,
     parent_node,
@@ -158,11 +169,13 @@ def eliminate_branch(
     ignore,
     hierarchy,
     num_points,
+    sample_weights,
 ):
     if branch_node < num_points:
         parents[idx] = parent_node
         children[idx] = branch_node
         lambdas[idx] = lambda_value
+        sizes[idx] = sample_weights[branch_node]
         idx += 1
     else:
         for sub_node in bfs_from_hierarchy(hierarchy, branch_node, num_points):
@@ -170,6 +183,7 @@ def eliminate_branch(
                 children[idx] = sub_node
                 parents[idx] = parent_node
                 lambdas[idx] = lambda_value
+                sizes[idx] = sample_weights[sub_node]
                 idx += 1
             else:
                 ignore[sub_node] = True
@@ -261,14 +275,17 @@ def condense_tree(
         # The logic here is in a strange order, but it has non-trivial performance gains ...
         # The most common case by far is a singleton on the left; and cluster on the right take care of this separately
         if left < num_points and right_count >= min_cluster_size:
-            relabel[right] = parent_node
-            parents[idx] = parent_node
-            children[idx] = left
-            lambdas[idx] = lambda_value
-            idx += 1
+            if right < num_points:
+                idx = emit_point(parents, children, lambdas, sizes, idx, parent_node, right, np.inf, sample_weights)
+            else:
+                relabel[right] = parent_node
+            idx = emit_point(parents, children, lambdas, sizes, idx, parent_node, left, lambda_value, sample_weights)
         # Next most common is a small left cluster and a large right cluster: relabel the right node; eliminate the left branch
         elif left_count < min_cluster_size and right_count >= min_cluster_size:
-            relabel[right] = parent_node
+            if right < num_points:
+                idx = emit_point(parents, children, lambdas, sizes, idx, parent_node, right, np.inf, sample_weights)
+            else:
+                relabel[right] = parent_node
             idx = eliminate_branch(
                 left,
                 parent_node,
@@ -281,10 +298,14 @@ def condense_tree(
                 ignore,
                 hierarchy,
                 num_points,
+                sample_weights,
             )
         # Then we have a large left cluster and a small right cluster: relabel the left node; eliminate the right branch
         elif left_count >= min_cluster_size and right_count < min_cluster_size:
-            relabel[left] = parent_node
+            if left < num_points:
+                idx = emit_point(parents, children, lambdas, sizes, idx, parent_node, left, np.inf, sample_weights)
+            else:
+                relabel[left] = parent_node
             idx = eliminate_branch(
                 right,
                 parent_node,
@@ -297,6 +318,7 @@ def condense_tree(
                 ignore,
                 hierarchy,
                 num_points,
+                sample_weights,
             )
         # If both clusters are small then eliminate all branches
         elif left_count < min_cluster_size and right_count < min_cluster_size:
@@ -312,6 +334,7 @@ def condense_tree(
                 ignore,
                 hierarchy,
                 num_points,
+                sample_weights,
             )
             idx = eliminate_branch(
                 right,
@@ -325,11 +348,15 @@ def condense_tree(
                 ignore,
                 hierarchy,
                 num_points,
+                sample_weights,
             )
         # If both clusters are too large then relabel both
         elif left_count > max_cluster_size and right_count > max_cluster_size:
-            relabel[left] = parent_node
-            relabel[right] = parent_node
+            for node_ in (left, right):
+                if node_ < num_points:
+                    idx = emit_point(parents, children, lambdas, sizes, idx, parent_node, node_, np.inf, sample_weights)
+                else:
+                    relabel[node_] = parent_node
         else:
             relabel[left] = next_label
 
@@ -339,6 +366,8 @@ def condense_tree(
             sizes[idx] = left_count
             next_label += 1
             idx += 1
+            if left < num_points:
+                idx = emit_point(parents, children, lambdas, sizes, idx, next_label - 1, left, np.inf, sample_weights)
 
             relabel[right] = next_label
 
@@ -348,6 +377,8 @@ def condense_tree(
             sizes[idx] = right_count
             next_label += 1
             idx += 1
+            if right < num_points:
+                idx = emit_point(parents, children, lambdas, sizes, idx, next_label - 1, right, np.inf, sample_weights)
 
     return CondensedTree(parents[:idx], children[:idx], lambdas[:idx], sizes[:idx])
 
@@ -359,8 +390,8 @@ def extract_leaves(condensed_tree, allow_single_cluster=True):
     leaf_indicator = np.ones(n_nodes, dtype=np.bool_)
     leaf_indicator[:n_points] = False
 
-    for parent, child_size in zip(condensed_tree.parent, condensed_tree.child_size):
-        if child_size > 1:
+    for parent, child in zip(condensed_tree.parent, condensed_tree.child):
+        if child >= n_points:
             leaf_indicator[parent] = False
 
     return np.nonzero(leaf_indicator)[0]
@@ -659,7 +690,7 @@ def score_condensed_tree_nodes(condensed_tree):
     result = {root: np.float32(0.0)}
 
     for i in range(condensed_tree.parent.shape[0]):
-        if condensed_tree.child_size[i] > 1:
+        if condensed_tree.child[i] >= root:
             child = condensed_tree.child[i]
             result[child] = -condensed_tree.lambda_val[i] * condensed_tree.child_size[i]
 
@@ -671,7 +702,9 @@ def score_condensed_tree_nodes(condensed_tree):
 
 @numba.njit(cache=NUMBA_CACHE)
 def cluster_tree_from_condensed_tree(condensed_tree):
-    return mask_condensed_tree(condensed_tree, condensed_tree.child_size > 1)
+    return mask_condensed_tree(
+        condensed_tree, condensed_tree.child >= condensed_tree.parent.min()
+    )
 
 
 @numba.njit(cache=NUMBA_CACHE)
