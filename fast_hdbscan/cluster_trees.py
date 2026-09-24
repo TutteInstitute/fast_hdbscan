@@ -892,7 +892,7 @@ def segments_in_branch(parents, children, segment):
         child_set.clear()
         for segment in to_process:
             idx = np.searchsorted(parents, segment)
-            if idx >= len(parents):
+            if idx >= len(parents) or parents[idx] != segment:
                 continue
             child_set.add(children[idx])
             child_set.add(children[idx + 1])
