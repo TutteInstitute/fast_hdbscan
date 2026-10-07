@@ -332,6 +332,23 @@ def test_plscan_set_params():
     assert hasattr(model, "labels_")
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"min_samples": -3},
+        {"min_samples": 2.5},
+        {"max_layers": 0},
+        {"base_min_cluster_size": -1},
+        {"base_n_clusters": 0},
+    ],
+)
+def test_plscan_set_params_invalid_raises_on_fit(params):
+    """Invalid values set after construction are rejected by fit."""
+    model = PLSCAN().set_params(**params)
+    with pytest.raises(ValueError):
+        model.fit(X)
+
+
 def test_plscan_vs_hdbscan_base_layer():
     """Test that PLSCAN base layer produces reasonable clustering similar to HDBSCAN."""
     from fast_hdbscan import HDBSCAN
