@@ -422,7 +422,7 @@ def get_condensed_tree_clusters_bcubed(
         value_type=int64_list_type,
     )
 
-    virtual_nodes = [0 for x in range(0)]
+    virtual_nodes = List.empty_list(int64)
     labeled_points = set(label_indices.keys())
 
     parents_set = set(list(condensed_tree.parent))
@@ -457,7 +457,11 @@ def get_condensed_tree_clusters_bcubed(
             cluster_elements[node] = List.empty_list(int64)
             cluster_elements[node].append(node)
 
-    return cluster_elements, np.array(virtual_nodes)
+    virtual_nodes_array = np.empty(len(virtual_nodes), dtype=np.int64)
+    for i in range(len(virtual_nodes)):
+        virtual_nodes_array[i] = virtual_nodes[i]
+
+    return cluster_elements, virtual_nodes_array
 
 
 @numba.njit(cache=NUMBA_CACHE)
@@ -581,7 +585,7 @@ def extract_clusters_bcubed(
 ):
     label_indices = Dict()
     for index in np.flatnonzero(data_labels > -1):
-        label_indices[index] = data_labels[index]
+        label_indices[index] = np.int64(data_labels[index])
 
     if allow_virtual_nodes:
 
