@@ -760,3 +760,16 @@ def test_issue_63_no_spurious_noise():
         assert noise_ratio < 0.9, (
             f"seed={seed}: {noise_ratio:.0%} noise, expected < 90%"
         )
+
+
+@pytest.mark.parametrize(
+    "attribute",
+    ["condensed_tree_", "single_linkage_tree_", "minimum_spanning_tree_"],
+)
+def test_tree_attributes_without_hdbscan(monkeypatch, attribute):
+    import fast_hdbscan.hdbscan as hdbscan_module
+
+    model = HDBSCAN(min_cluster_size=5).fit(X)
+    monkeypatch.setattr(hdbscan_module, "_HAVE_HDBSCAN", False)
+    with pytest.raises(ImportError, match="hdbscan"):
+        getattr(model, attribute)
