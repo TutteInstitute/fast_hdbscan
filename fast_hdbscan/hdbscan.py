@@ -40,6 +40,14 @@ except ImportError:
     _HAVE_HDBSCAN = False
 
 
+def _check_have_hdbscan(attribute):
+    if not _HAVE_HDBSCAN:
+        raise ImportError(
+            f"The {attribute} attribute requires the hdbscan package for its "
+            "tree classes; install it with 'pip install hdbscan'."
+        )
+
+
 # Simplified version of sklearn's check_sample_weight
 def _check_sample_weight(
     sample_weight,
@@ -840,6 +848,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             "_condensed_tree",
             msg="You first need to fit the HDBSCAN model before accessing the condensed tree",
         )
+        _check_have_hdbscan("condensed_tree_")
         if self._condensed_tree is not None:
             return CondensedTree(
                 self._condensed_tree,
@@ -857,6 +866,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             "_single_linkage_tree",
             msg="You first need to fit the HDBSCAN model before accessing the single linkage tree",
         )
+        _check_have_hdbscan("single_linkage_tree_")
         if self._single_linkage_tree is not None:
             return SingleLinkageTree(self._single_linkage_tree)
         else:
@@ -871,6 +881,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             "_min_spanning_tree",
             msg="You first need to fit the HDBSCAN model before accessing the minimum spanning tree",
         )
+        _check_have_hdbscan("minimum_spanning_tree_")
         if self._min_spanning_tree is not None:
             if self._raw_data is not None:
                 return MinimumSpanningTree(self._min_spanning_tree, self._raw_data)
