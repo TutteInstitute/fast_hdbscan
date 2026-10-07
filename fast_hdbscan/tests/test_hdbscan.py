@@ -31,7 +31,6 @@ import pytest
 from sklearn import datasets
 
 import warnings
-import sys
 
 n_clusters = 3
 # X = generate_clustered_data(n_clusters=n_clusters, n_samples_per_cluster=50)
@@ -164,6 +163,18 @@ def test_hdbscan_badargs():
         fast_hdbscan(X, semi_supervised=True, ss_algorithm="fail")
     with pytest.raises(ValueError):
         fast_hdbscan(X, semi_supervised=True, data_labels=None)
+
+
+@pytest.mark.parametrize("ss_algorithm", ["bc", "bc_simple"])
+@pytest.mark.parametrize("label_dtype", [np.int64, np.int32, np.float64])
+def test_hdbscan_semi_supervised_label_dtypes(ss_algorithm, label_dtype):
+    partial_labels = np.full(y.shape[0], -1)
+    partial_labels[::10] = y[::10]
+    labels = HDBSCAN(
+        min_cluster_size=5, semi_supervised=True, ss_algorithm=ss_algorithm
+    ).fit(X, partial_labels.astype(label_dtype)).labels_
+    n_clusters_1 = len(set(labels)) - int(-1 in labels)
+    assert n_clusters_1 == n_clusters
 
 
 def test_hdbscan_allow_single_cluster_with_epsilon():
@@ -371,11 +382,6 @@ def test_precomputed_semi_supervised_matches_euclidean_behavior():
     We use a full pairwise graph built from X and verify exact label parity after
     canonical label alignment, matching the repository's metric parity strategy.
     """
-    if sys.version_info < (3, 12):
-        pytest.skip(
-            "Numba typing instability in legacy bcubed extraction on Python < 3.12"
-        )
-
     X_local, _ = make_blobs(
         n_samples=40,
         centers=[[-2.0, -2.0], [0.0, 0.0], [2.0, 2.0]],
