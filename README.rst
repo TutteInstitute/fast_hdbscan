@@ -16,7 +16,7 @@ modern multicore laptops.
 
 This library provides a
 re-implementation of a subset of the HDBSCAN algorithm that is compatible with the
-`hdbscan <https://github.com/scikit-learn-contrib/hdbscan>`_ library. There are specific optimizationsfor data that is Euclidean and
+`hdbscan <https://github.com/scikit-learn-contrib/hdbscan>`_ library. There are specific optimizations for data that is Euclidean and
 low dimensional, other distance metrics and high dimensional data fallback to alternative parallel approaches that are faster than the
 hdbscan library, but not necessarily as performant as the highly optimized low-dimensional Euclidean case. 
 The primary advantages of this library over the standard ``hdbscan`` library are:
