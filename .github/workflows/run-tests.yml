@@ -1,4 +1,4 @@
-name: fast_hdbscan
+name: Run tests
 on:
   workflow_dispatch:
   workflow_call:
