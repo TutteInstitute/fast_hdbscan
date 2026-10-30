@@ -21,8 +21,9 @@ from sklearn.datasets import make_blobs
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import shuffle
 
-from fast_hdbscan import HDBSCAN, fast_hdbscan
+from fast_hdbscan import HDBSCAN, PLSCAN, fast_hdbscan
 from fast_hdbscan.hdbscan import compute_minimum_spanning_tree
+from fast_hdbscan.nndescent import HAVE_PYNNDESCENT
 
 
 # ---------------------------------------------------------------------------
@@ -1868,3 +1869,32 @@ class TestCannotLinkGroupsLargeGroups:
             mst_sparse, mst_group,
             err_msg="128-group MST edges differ from sparse CL equivalent",
         )
+
+
+@pytest.mark.skipif(not HAVE_PYNNDESCENT, reason="pynndescent not installed")
+@pytest.mark.parametrize("metric,n_features", [("euclidean", 31), ("cosine", 2)])
+@pytest.mark.parametrize("model", ["hdbscan_groups", "hdbscan_matrix", "plscan_matrix"])
+def test_cannot_link_knn_graph_path(metric, n_features, model):
+    """CL is honored on the pynndescent path (non-euclidean, or > 30 features)."""
+    rng = np.random.RandomState(0)
+    n_groups, n_sessions = 20, 6
+    # Near-identical pairs of groups merge unless CL keeps them apart
+    centers = np.repeat(rng.normal(scale=10.0, size=(n_groups // 2, n_features)), 2, axis=0)
+    X = np.repeat(centers, n_sessions, axis=0) + rng.normal(
+        scale=0.1, size=(n_groups * n_sessions, n_features)
+    )
+    session = np.tile(np.arange(n_sessions, dtype=np.int32), n_groups)
+
+    if model == "hdbscan_groups":
+        clusterer = HDBSCAN(min_cluster_size=4, min_samples=2, metric=metric,
+                            algorithm="kruskal", cannot_link_groups=session)
+    elif model == "hdbscan_matrix":
+        clusterer = HDBSCAN(min_cluster_size=4, min_samples=2, metric=metric,
+                            algorithm="kruskal", cannot_link=_groups_to_cl_matrix(session))
+    else:
+        clusterer = PLSCAN(base_min_cluster_size=4, metric=metric,
+                           algorithm="kruskal", cannot_link=_groups_to_cl_matrix(session))
+    labels = clusterer.fit(X).labels_
+
+    assert labels.max() >= 0
+    assert _check_cl_violations(labels, _groups_to_cl_pairs(session)) == []
