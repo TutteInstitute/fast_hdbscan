@@ -183,6 +183,9 @@ def compute_mst_from_knn_graph(
     metric_kwds=None,
     knn_k=None,
     random_state=None,
+    cannot_link=None,
+    validate_cannot_link=True,
+    cannot_link_groups=None,
 ):
     """
     Compute HDBSCAN MST using a pynndescent KNN graph for arbitrary metrics.
@@ -200,6 +203,8 @@ def compute_mst_from_knn_graph(
         Number of neighbors for KNN graph. If None, defaults to
         max(3 * min_samples, 15).
     random_state : int, RandomState, or None
+    cannot_link, validate_cannot_link, cannot_link_groups
+        See ``compute_minimum_spanning_tree``.
 
     Returns
     -------
@@ -207,9 +212,16 @@ def compute_mst_from_knn_graph(
     neighbors : ndarray of shape (n, k), int32
     core_distances : ndarray of shape (n,), float64
     """
+    from .kruskal import _resolve_cl_params
     from .precomputed import bridge_forest_with_inf
 
     n = data.shape[0]
+    cl = _resolve_cl_params(
+        n,
+        cannot_link=cannot_link,
+        validate_cannot_link=validate_cannot_link,
+        cannot_link_groups=cannot_link_groups,
+    )
 
     # Determine knn_k
     if knn_k is None:
@@ -246,6 +258,7 @@ def compute_mst_from_knn_graph(
         knn_distances,
         core_distances,
         n,
+        cl,
     )
 
     # Handle disconnected components by bridging with +inf edges
@@ -255,7 +268,7 @@ def compute_mst_from_knn_graph(
     return mst_edges, neighbors_out, core_distances
 
 
-def _kruskal_mst_from_knn(knn_indices, knn_distances, core_distances, n):
+def _kruskal_mst_from_knn(knn_indices, knn_distances, core_distances, n, cl):
     """
     Run Kruskal MST on a KNN graph with MRD weights.
 
@@ -267,7 +280,7 @@ def _kruskal_mst_from_knn(knn_indices, knn_distances, core_distances, n):
     """
     from .kruskal import (
         _build_mrd_edges_knn,
-        _kruskal_core,
+        _run_kruskal_core,
         _get_component_labels_jit,
     )
 
@@ -286,7 +299,9 @@ def _kruskal_mst_from_knn(knn_indices, knn_distances, core_distances, n):
 
     # Global stable sort + Kruskal DSU
     sorted_order = np.argsort(weights, kind="stable").astype(np.int32)
-    mst_edges, predecessors = _kruskal_core(weights, row_idx, col_idx, sorted_order, n)
+    mst_edges, predecessors = _run_kruskal_core(
+        weights, row_idx, col_idx, sorted_order, n, cl
+    )
 
     component_labels = _get_component_labels_jit(predecessors)
     n_components = int(np.unique(component_labels).shape[0])

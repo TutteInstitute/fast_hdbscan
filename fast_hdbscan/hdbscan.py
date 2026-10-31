@@ -460,6 +460,9 @@ def compute_minimum_spanning_tree(
             metric=metric,
             metric_kwds=metric_kwds,
             knn_k=knn_k,
+            cannot_link=cannot_link,
+            validate_cannot_link=validate_cannot_link,
+            cannot_link_groups=cannot_link_groups,
         )
 
     # metric == "euclidean"
