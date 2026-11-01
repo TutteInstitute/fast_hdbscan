@@ -457,7 +457,11 @@ def get_condensed_tree_clusters_bcubed(
             cluster_elements[node] = List.empty_list(int64)
             cluster_elements[node].append(node)
 
-    return cluster_elements, np.array(virtual_nodes)
+    virtual_nodes_array = np.empty(len(virtual_nodes), dtype=np.int64)
+    for i, node in enumerate(virtual_nodes):
+        virtual_nodes_array[i] = node
+
+    return cluster_elements, virtual_nodes_array
 
 
 @numba.njit(cache=NUMBA_CACHE)
