@@ -196,6 +196,72 @@ def remap_single_linkage_tree(tree, internal_to_raw, outliers):
     return tree
 
 
+def relative_validity(minimum_spanning_tree, labels, n_samples=None):
+    """Approximate DBCV score of a clustering from its mutual reachability MST.
+
+    Same score as ``hdbscan``'s ``relative_validity_``: density sparseness
+    and separation are read from the MST edges instead of the all-points
+    MST of the reference DBCV, so it is only meaningful for comparing
+    hyper-parameter choices on the same data.
+
+    Parameters
+    ----------
+    minimum_spanning_tree: ndarray of shape (n_edges, 3)
+        Rows of ``(from, to, mutual reachability distance)``.
+    labels: ndarray of shape (n_samples,)
+        Cluster labels aligned with the MST's point indices; ``-1`` is noise.
+    n_samples: int, optional
+        Number of points to divide by; defaults to ``len(labels)``. Points
+        left out of the MST count as noise.
+
+    Returns
+    -------
+    score: float
+    """
+    labels = np.asarray(labels, dtype=np.intp)
+    cluster_sizes = np.bincount(labels[labels >= 0])
+    num_clusters = len(cluster_sizes)
+    if n_samples is None:
+        n_samples = labels.shape[0]
+
+    edge_from = minimum_spanning_tree[:, 0].astype(np.intp)
+    edge_to = minimum_spanning_tree[:, 1].astype(np.intp)
+    edge_dist = minimum_spanning_tree[:, 2]
+    from_label = labels[edge_from]
+    to_label = labels[edge_to]
+
+    # Disconnected components are joined by infinite edges, which connect nothing.
+    connected = np.isfinite(edge_dist)
+    max_distance = edge_dist[connected].max() if connected.any() else 0.0
+
+    neither_noise = (from_label != -1) & (to_label != -1)
+    one_noise = connected & ((from_label == -1) ^ (to_label == -1))
+    same_cluster = connected & neither_noise & (from_label == to_label)
+    diff_cluster = connected & neither_noise & (from_label != to_label)
+    split_cluster = ~connected & neither_noise & (from_label == to_label)
+
+    density_sparseness = np.zeros(num_clusters)
+    np.maximum.at(density_sparseness, from_label[same_cluster], edge_dist[same_cluster])
+
+    density_separation = np.full(num_clusters, np.inf)
+    np.minimum.at(density_separation, from_label[diff_cluster], edge_dist[diff_cluster])
+    np.minimum.at(density_separation, to_label[diff_cluster], edge_dist[diff_cluster])
+
+    # A cluster with no MST edge to another cluster gets a separation large
+    # enough to count as well separated, as in hdbscan.
+    if num_clusters == 1 and one_noise.any():
+        isolated_separation = 2 * edge_dist[one_noise].min()
+    else:
+        isolated_separation = 2 * max_distance
+    density_separation[np.isinf(density_separation)] = isolated_separation
+
+    validity = (density_separation - density_sparseness) / np.maximum(
+        density_separation, density_sparseness
+    )
+    validity[from_label[split_cluster]] = -1.0
+    return float(np.sum(cluster_sizes * validity) / n_samples)
+
+
 def fast_hdbscan(
     data,
     data_labels=None,
@@ -644,6 +710,12 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         Cluster labels.  ``-1`` indicates noise.
     probabilities_ : float64[:], shape (n_samples,)
         Cluster membership strengths in [0, 1].
+    relative_validity_ : float
+        A fast approximation of the Density Based Cluster Validity (DBCV)
+        score, computed from the mutual reachability minimum spanning tree
+        instead of the all-points one. Like ``hdbscan``'s attribute of the
+        same name, it is only a relative score for comparing
+        hyper-parameter choices on the same data.
     """
 
     def __init__(
@@ -805,6 +877,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         )
 
         self._condensed_tree = to_numpy_rec_array(self._condensed_tree)
+        self._mst_labels = self.labels_
 
         if not self._all_finite:
             # remap indices to align with original data in the case of non-finite entries.
@@ -888,6 +961,17 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             raise AttributeError(
                 "No minimum spanning tree was generated; try running fit first."
             )
+
+    @property
+    def relative_validity_(self):
+        check_is_fitted(
+            self,
+            "_min_spanning_tree",
+            msg="You first need to fit the HDBSCAN model before accessing the relative validity",
+        )
+        return relative_validity(
+            self._min_spanning_tree, self._mst_labels, n_samples=len(self.labels_)
+        )
 
 
 class PLSCAN(ClusterMixin, BaseEstimator):
