@@ -245,4 +245,6 @@ def test_approximation_graph_plot_with_clustered_only_positions(plt):
     g = BranchDetector().fit(c_noisy).approximation_graph_
     g.plot(positions=X_noisy[g.point_mask])
     np.testing.assert_array_equal(g._xs[g.point_mask], X_noisy[g.point_mask, 0])
+    np.testing.assert_array_equal(g._ys[g.point_mask], X_noisy[g.point_mask, 1])
     assert np.isnan(g._xs[~g.point_mask]).all()
+    assert np.isnan(g._ys[~g.point_mask]).all()
