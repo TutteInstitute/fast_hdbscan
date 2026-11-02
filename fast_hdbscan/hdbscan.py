@@ -31,6 +31,7 @@ from .cluster_trees import (
     get_point_membership_strength_vector,
     cluster_tree_from_condensed_tree,
     extract_clusters_bcubed,
+    glosh_outlier_scores,
 )
 from .layer_clusters import build_cluster_layers, build_layer_cluster_tree
 
@@ -777,6 +778,10 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         Cluster labels.  ``-1`` indicates noise.
     probabilities_ : float64[:], shape (n_samples,)
         Cluster membership strengths in [0, 1].
+    outlier_scores_ : float64[:], shape (n_samples,)
+        GLOSH outlier scores, as in ``hdbscan``: the larger the score, the
+        more outlying the point. Scores lie in [0, 1], except that exact
+        duplicate points can make them NaN, as they do in ``hdbscan``.
     relative_validity_ : float
         A fast approximation of the Density Based Cluster Validity (DBCV)
         score, computed from the mutual reachability minimum spanning tree
@@ -1039,6 +1044,21 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
                 "No minimum spanning tree was generated; try running fit first."
             )
 
+    @property
+    def outlier_scores_(self):
+        check_is_fitted(
+            self,
+            "_condensed_tree",
+            msg="You first need to fit the HDBSCAN model before accessing the outlier scores",
+        )
+        tree = self._condensed_tree
+        return glosh_outlier_scores(
+            np.ascontiguousarray(tree["parent"]),
+            np.ascontiguousarray(tree["child"]),
+            np.ascontiguousarray(tree["lambda_val"]),
+            len(self.labels_),
+        )
+      
     @property
     def relative_validity_(self):
         check_is_fitted(
