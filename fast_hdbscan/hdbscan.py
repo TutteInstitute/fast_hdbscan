@@ -197,6 +197,72 @@ def remap_single_linkage_tree(tree, internal_to_raw, outliers):
     return tree
 
 
+def relative_validity(minimum_spanning_tree, labels, n_samples=None):
+    """Approximate DBCV score of a clustering from its mutual reachability MST.
+
+    Same score as ``hdbscan``'s ``relative_validity_``: density sparseness
+    and separation are read from the MST edges instead of the all-points
+    MST of the reference DBCV, so it is only meaningful for comparing
+    hyper-parameter choices on the same data.
+
+    Parameters
+    ----------
+    minimum_spanning_tree: ndarray of shape (n_edges, 3)
+        Rows of ``(from, to, mutual reachability distance)``.
+    labels: ndarray of shape (n_samples,)
+        Cluster labels aligned with the MST's point indices; ``-1`` is noise.
+    n_samples: int, optional
+        Number of points to divide by; defaults to ``len(labels)``. Points
+        left out of the MST count as noise.
+
+    Returns
+    -------
+    score: float
+    """
+    labels = np.asarray(labels, dtype=np.intp)
+    cluster_sizes = np.bincount(labels[labels >= 0])
+    num_clusters = len(cluster_sizes)
+    if n_samples is None:
+        n_samples = labels.shape[0]
+
+    edge_from = minimum_spanning_tree[:, 0].astype(np.intp)
+    edge_to = minimum_spanning_tree[:, 1].astype(np.intp)
+    edge_dist = minimum_spanning_tree[:, 2]
+    from_label = labels[edge_from]
+    to_label = labels[edge_to]
+
+    # Disconnected components are joined by infinite edges, which connect nothing.
+    connected = np.isfinite(edge_dist)
+    max_distance = edge_dist[connected].max() if connected.any() else 0.0
+
+    neither_noise = (from_label != -1) & (to_label != -1)
+    one_noise = connected & ((from_label == -1) ^ (to_label == -1))
+    same_cluster = connected & neither_noise & (from_label == to_label)
+    diff_cluster = connected & neither_noise & (from_label != to_label)
+    split_cluster = ~connected & neither_noise & (from_label == to_label)
+
+    density_sparseness = np.zeros(num_clusters)
+    np.maximum.at(density_sparseness, from_label[same_cluster], edge_dist[same_cluster])
+
+    density_separation = np.full(num_clusters, np.inf)
+    np.minimum.at(density_separation, from_label[diff_cluster], edge_dist[diff_cluster])
+    np.minimum.at(density_separation, to_label[diff_cluster], edge_dist[diff_cluster])
+
+    # A cluster with no MST edge to another cluster gets a separation large
+    # enough to count as well separated, as in hdbscan.
+    if num_clusters == 1 and one_noise.any():
+        isolated_separation = 2 * edge_dist[one_noise].min()
+    else:
+        isolated_separation = 2 * max_distance
+    density_separation[np.isinf(density_separation)] = isolated_separation
+
+    validity = (density_separation - density_sparseness) / np.maximum(
+        density_separation, density_sparseness
+    )
+    validity[from_label[split_cluster]] = -1.0
+    return float(np.sum(cluster_sizes * validity) / n_samples)
+
+
 def fast_hdbscan(
     data,
     data_labels=None,
@@ -219,6 +285,8 @@ def fast_hdbscan(
     validate_cannot_link=True,
     cannot_link_groups=None,
     metric_kwds=None,
+    *,
+    cluster_selection_epsilon_max=np.inf,
 ):
     """
     Run the full HDBSCAN pipeline: MST construction, condensed tree
@@ -266,6 +334,15 @@ def fast_hdbscan(
     ):
         raise ValueError(
             "Cluster selection epsilon must be a positive floating point number!"
+        )
+    if (
+        not isinstance(cluster_selection_epsilon_max, numbers.Real)
+        or isinstance(cluster_selection_epsilon_max, bool)
+        or not cluster_selection_epsilon_max >= cluster_selection_epsilon
+    ):
+        raise ValueError(
+            "Cluster selection epsilon max must be a number no smaller than "
+            "cluster selection epsilon!"
         )
     if (
         not np.issubdtype(type(cluster_selection_persistence), np.floating)
@@ -331,6 +408,7 @@ def fast_hdbscan(
             cluster_selection_epsilon=cluster_selection_epsilon,
             cluster_selection_persistence=cluster_selection_persistence,
             sample_weights=sample_weights,
+            cluster_selection_epsilon_max=cluster_selection_epsilon_max,
         ),
         neighbors,
         core_distances,
@@ -510,6 +588,8 @@ def clusters_from_spanning_tree(
     cluster_selection_epsilon=0.0,
     cluster_selection_persistence=0.0,
     sample_weights=None,
+    *,
+    cluster_selection_epsilon_max=np.inf,
 ):
     n_points = minimum_spanning_tree.shape[0] + 1
     sorted_mst = minimum_spanning_tree[
@@ -552,6 +632,7 @@ def clusters_from_spanning_tree(
                 cluster_tree,
                 max_cluster_size=max_cluster_size,
                 allow_single_cluster=allow_single_cluster,
+                cluster_selection_epsilon_max=cluster_selection_epsilon_max,
             )
     elif cluster_selection_method == "leaf":
         if cluster_tree.parent.shape[0] == 0:
@@ -613,6 +694,12 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         Upper bound on cluster size (EOM only).
     cluster_selection_epsilon : float
         DBSCAN-style epsilon threshold for cluster selection.
+    cluster_selection_epsilon_max : float
+        Clusters born at a distance above this are split, as in ``hdbscan``
+        (EOM only; no effect with ``'leaf'`` or ``semi_supervised``). Must
+        be at least ``cluster_selection_epsilon``. ``cluster_selection_epsilon``
+        merges clusters afterwards, so it can still select a cluster born
+        above this limit.
     cluster_selection_persistence : float
         Minimum persistence for a cluster to be selected.
     semi_supervised : bool
@@ -649,6 +736,12 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         GLOSH outlier scores, as in ``hdbscan``: the larger the score, the
         more outlying the point. Scores lie in [0, 1], except that exact
         duplicate points can make them NaN, as they do in ``hdbscan``.
+    relative_validity_ : float
+        A fast approximation of the Density Based Cluster Validity (DBCV)
+        score, computed from the mutual reachability minimum spanning tree
+        instead of the all-points one. Like ``hdbscan``'s attribute of the
+        same name, it is only a relative score for comparing
+        hyper-parameter choices on the same data.
     """
 
     def __init__(
@@ -660,6 +753,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         allow_single_cluster=False,
         max_cluster_size=np.inf,
         cluster_selection_epsilon=0.0,
+        cluster_selection_epsilon_max=np.inf,
         cluster_selection_persistence=0.0,
         semi_supervised=False,
         ss_algorithm="bc",
@@ -679,6 +773,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.allow_single_cluster = allow_single_cluster
         self.max_cluster_size = max_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
+        self.cluster_selection_epsilon_max = cluster_selection_epsilon_max
         self.cluster_selection_persistence = cluster_selection_persistence
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
@@ -810,6 +905,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         )
 
         self._condensed_tree = to_numpy_rec_array(self._condensed_tree)
+        self._mst_labels = self.labels_
 
         if not self._all_finite:
             # remap indices to align with original data in the case of non-finite entries.
@@ -907,6 +1003,17 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             np.ascontiguousarray(tree["child"]),
             np.ascontiguousarray(tree["lambda_val"]),
             len(self.labels_),
+        )
+      
+    @property
+    def relative_validity_(self):
+        check_is_fitted(
+            self,
+            "_min_spanning_tree",
+            msg="You first need to fit the HDBSCAN model before accessing the relative validity",
+        )
+        return relative_validity(
+            self._min_spanning_tree, self._mst_labels, n_samples=len(self.labels_)
         )
 
 

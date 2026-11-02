@@ -364,6 +364,21 @@ def test_precomputed_semi_supervised_label_length_validation():
         HDBSCAN(metric="precomputed", semi_supervised=True).fit(G, np.array([0, 1, 2]))
 
 
+def test_precomputed_semi_supervised_disconnected_graph_with_single_cluster():
+    clique = sparse.csr_matrix(np.ones((4, 4)) - np.eye(4))
+    graph = sparse.block_diag([clique] * 3, format="csr")
+
+    model = HDBSCAN(
+        metric="precomputed",
+        min_cluster_size=2,
+        min_samples=1,
+        semi_supervised=True,
+        allow_single_cluster=True,
+    ).fit(graph, np.zeros(12, dtype=int))
+
+    assert np.all(model.labels_ == 0)
+
+
 def test_precomputed_semi_supervised_matches_euclidean_behavior():
     """
     Semi-supervised clustering should behave the same for euclidean and precomputed paths.
