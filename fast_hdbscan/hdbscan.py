@@ -35,12 +35,7 @@ from .cluster_trees import (
 )
 from .layer_clusters import build_cluster_layers, build_layer_cluster_tree
 
-try:
-    from hdbscan.plots import CondensedTree, SingleLinkageTree, MinimumSpanningTree
-
-    _HAVE_HDBSCAN = True
-except ImportError:
-    _HAVE_HDBSCAN = False
+from .plots import CondensedTree, SingleLinkageTree, MinimumSpanningTree
 
 
 # Simplified version of sklearn's check_sample_weight

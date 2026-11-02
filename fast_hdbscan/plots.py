@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
-# Author: Leland McInnes <leland.mcinnes@gmail.com>
-#
-# License: BSD 3 clause
+# Adapted from hdbscan.plots (https://github.com/scikit-learn-contrib/hdbscan)
+# Original author: Leland McInnes <leland.mcinnes@gmail.com>
+# Original license: BSD 3 clause
 
 import numpy as np
 
-from scipy.cluster.hierarchy import dendrogram
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
-from sklearn.metrics import pairwise_distances
 from warnings import warn
-from ._hdbscan_tree import compute_stability, labelling_at_cut, recurse_leaf_dfs
+from .cluster_trees import get_cluster_labelling_at_cut
 
 CB_LEFT = 0
 CB_RIGHT = 1
@@ -34,11 +30,18 @@ def _bfs_from_cluster_tree(tree, bfs_root):
 
 
 def _recurse_leaf_dfs(cluster_tree, current_node):
-    children = cluster_tree[cluster_tree['parent'] == current_node]['child']
-    if len(children) == 0:
-        return [current_node,]
-    else:
-        return sum([recurse_leaf_dfs(cluster_tree, child) for child in children], [])
+    # Iterative depth-first walk (leaves in left-to-right order), so deep
+    # trees do not hit Python's recursion limit.
+    leaves = []
+    to_visit = [current_node]
+    while to_visit:
+        node = to_visit.pop()
+        children = cluster_tree[cluster_tree['parent'] == node]['child']
+        if len(children) == 0:
+            leaves.append(node)
+        else:
+            to_visit.extend(children[::-1])
+    return leaves
 
 
 def _get_leaves(condensed_tree):
@@ -53,7 +56,7 @@ def _get_leaves(condensed_tree):
 
 class CondensedTree(object):
     """The condensed tree structure, which provides a simplified or smoothed version
-    of the :class:`~hdbscan.plots.SingleLinkageTree`.
+    of the :class:`~fast_hdbscan.plots.SingleLinkageTree`.
 
     Parameters
     ----------
@@ -575,6 +578,8 @@ class SingleLinkageTree(object):
                The axis on which the dendrogram plot has been rendered.
 
         """
+        from scipy.cluster.hierarchy import dendrogram
+
         dendrogram_data = dendrogram(self._linkage, p=p, truncate_mode=truncate_mode, no_plot=True)
         X = dendrogram_data['icoord']
         Y = dendrogram_data['dcoord']
@@ -735,7 +740,7 @@ class SingleLinkageTree(object):
             An array of cluster labels, one per datapoint. Unclustered points are assigned
             the label -1.
         """
-        return labelling_at_cut(self._linkage, cut_distance, min_cluster_size)
+        return get_cluster_labelling_at_cut(self._linkage, cut_distance, min_cluster_size)
 
 
 class MinimumSpanningTree(object):
@@ -803,6 +808,9 @@ class MinimumSpanningTree(object):
             axis = plt.gca()
 
         if self._data.shape[1] > 2:
+            from sklearn.decomposition import PCA
+            from sklearn.manifold import TSNE
+
             # Get a 2D projection; if we have a lot of dimensions use PCA first
             if self._data.shape[1] > 32:
                 # Use PCA to get down to 32 dimension
