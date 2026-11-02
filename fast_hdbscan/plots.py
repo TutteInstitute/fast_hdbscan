@@ -960,7 +960,7 @@ class ApproximationGraph:
         self.lens_name = lens_name or "lens_value"
         self.sub_cluster_name = sub_cluster_name or "sub_cluster"
         self._pos = None
-        self.point_mask = np.ones(labels.shape[0], dtype=np.bool) if cluster_labels is None else cluster_labels >= 0
+        self.point_mask = np.ones(labels.shape[0], dtype=bool) if cluster_labels is None else cluster_labels >= 0
         self._raw_data = raw_data[self.point_mask, :] if raw_data is not None else None
 
         num_edges = sum(len(edges) for edges in approximation_graphs)
@@ -998,7 +998,7 @@ class ApproximationGraph:
         if sub_cluster_probabilities is not None:
             dtypes += [(probability_name, np.float64)]
         self._points = np.empty(self.point_mask.sum(), dtype=dtypes)
-        self._points["id"] = np.arange(self.point_mask.sum())
+        self._points["id"] = np.flatnonzero(self.point_mask)
         self._points["label"] = labels[self.point_mask]
         self._points["probability"] = probabilities[self.point_mask]
         self._points[self.lens_name] = lens_values[self.point_mask]
@@ -1160,8 +1160,8 @@ class ApproximationGraph:
                 self._ys = positions[:, 1]
             elif positions.shape[0] == len(self._points):
                 for i, d in enumerate(self._points["id"]):
-                    self._xs[d, 0] = positions[i, 0]
-                    self._ys[d, 1] = positions[i, 1]
+                    self._xs[d] = positions[i, 0]
+                    self._ys[d] = positions[i, 1]
             else:
                 raise ValueError("Incorrect number of positions specified.")
         source = self._edges["parent"]
