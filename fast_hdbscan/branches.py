@@ -143,7 +143,7 @@ class BranchDetector(SubClusterDetector):
 
     @property
     def approximation_graph_(self):
-        """See :class:`~hdbscan.plots.ApproximationGraph` for documentation."""
+        """See :class:`~fast_hdbscan.plots.ApproximationGraph` for documentation."""
         return super()._make_approximation_graph(
             lens_name="centrality", sub_cluster_name="branch"
         )

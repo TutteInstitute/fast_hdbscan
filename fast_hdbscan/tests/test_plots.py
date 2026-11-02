@@ -9,8 +9,10 @@ import pytest
 from sklearn.datasets import make_blobs
 from sklearn.preprocessing import StandardScaler
 
+import fast_hdbscan.branches
 import fast_hdbscan.hdbscan
 import fast_hdbscan.plots
+import fast_hdbscan.sub_clusters
 from fast_hdbscan import HDBSCAN
 from fast_hdbscan.plots import (
     CondensedTree,
@@ -34,7 +36,15 @@ def test_tree_attributes_use_fast_hdbscan_classes(model):
     assert isinstance(model.minimum_spanning_tree_, MinimumSpanningTree)
 
 
-@pytest.mark.parametrize("module", [fast_hdbscan.plots, fast_hdbscan.hdbscan])
+@pytest.mark.parametrize(
+    "module",
+    [
+        fast_hdbscan.plots,
+        fast_hdbscan.hdbscan,
+        fast_hdbscan.sub_clusters,
+        fast_hdbscan.branches,
+    ],
+)
 def test_module_does_not_import_hdbscan(module):
     tree = ast.parse(Path(module.__file__).read_text())
     imported = set()

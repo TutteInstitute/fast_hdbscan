@@ -7,12 +7,7 @@ import numpy as np
 from sklearn.exceptions import NotFittedError
 from fast_hdbscan import HDBSCAN, BranchDetector, find_branch_sub_clusters
 
-try:
-    from hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
-
-    HAVE_HDBSCAN = True
-except ModuleNotFoundError:
-    HAVE_HDBSCAN = False
+from fast_hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
 
 
 def make_branches(points_per_branch=30):
@@ -66,7 +61,6 @@ def check_detected_groups(c, n_clusters=3, n_branches=6, overridden=False):
 # --- Detecting Branches
 
 
-@pytest.mark.skipif(not HAVE_HDBSCAN, reason="Requires HDBSCAN")
 def test_attributes():
     b = BranchDetector().fit(c)
     check_detected_groups(b, n_clusters=2, n_branches=5)
@@ -192,3 +186,36 @@ def test_badargs():
             c,
             cluster_selection_method="something_else",
         )
+
+
+# --- Attribute output formats and plots
+
+
+def test_approximation_graph_output_formats():
+    b = BranchDetector().fit(c)
+    points, edges = b.approximation_graph_.to_numpy()
+    assert points.shape[0] <= X.shape[0]  # Excludes noise points
+    assert edges.shape[0] > 0
+
+
+def test_approximation_graph_pandas_and_networkx():
+    pytest.importorskip("pandas")
+    pytest.importorskip("networkx")
+    g = BranchDetector().fit(c).approximation_graph_
+    points, edges = g.to_pandas()
+    assert len(points) > 0 and len(edges) > 0
+    assert g.to_networkx().number_of_nodes() > 0
+
+
+def test_approximation_graph_plot():
+    matplotlib = pytest.importorskip("matplotlib")
+    pytest.importorskip("networkx")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    g = BranchDetector().fit(c).approximation_graph_
+    try:
+        g.plot(positions=X)
+        g.plot(positions=X, node_color=X[:, 0], edge_color="k", node_alpha=0.5)
+    finally:
+        plt.close("all")

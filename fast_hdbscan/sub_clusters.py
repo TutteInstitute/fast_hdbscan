@@ -538,11 +538,11 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
 
     @property
     def approximation_graph_(self):
-        """See :class:`~hdbscan.plots.ApproximationGraph` for documentation."""
+        """See :class:`~fast_hdbscan.plots.ApproximationGraph` for documentation."""
         return self._make_approximation_graph()
 
     def _make_approximation_graph(self, lens_name=None, sub_cluster_name=None):
-        from hdbscan.plots import ApproximationGraph
+        from .plots import ApproximationGraph
 
         check_is_fitted(
             self,
@@ -573,8 +573,8 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
 
     @property
     def condensed_trees_(self):
-        """See :class:`~hdbscan.plots.CondensedTree` for documentation."""
-        from hdbscan.plots import CondensedTree
+        """See :class:`~fast_hdbscan.plots.CondensedTree` for documentation."""
+        from .plots import CondensedTree
 
         check_is_fitted(
             self,
@@ -598,8 +598,8 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
 
     @property
     def linkage_trees_(self):
-        """See :class:`~hdbscan.plots.SingleLinkageTree` for documentation."""
-        from hdbscan.plots import SingleLinkageTree
+        """See :class:`~fast_hdbscan.plots.SingleLinkageTree` for documentation."""
+        from .plots import SingleLinkageTree
 
         check_is_fitted(
             self,
@@ -613,8 +613,8 @@ class SubClusterDetector(ClusterMixin, BaseEstimator):
 
     @property
     def spanning_trees_(self):
-        """See :class:`~hdbscan.plots.MinimumSpanningTree` for documentation."""
-        from hdbscan.plots import MinimumSpanningTree
+        """See :class:`~fast_hdbscan.plots.MinimumSpanningTree` for documentation."""
+        from .plots import MinimumSpanningTree
 
         check_is_fitted(
             self,
