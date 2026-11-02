@@ -9,6 +9,8 @@ from sklearn.utils.validation import (
     check_non_negative,
     validate_data,
 )
+from sklearn.metrics import pairwise_distances
+from sklearn.metrics.pairwise import _VALID_METRICS as SKLEARN_METRICS
 from sklearn.neighbors import KDTree
 
 from warnings import warn
@@ -196,6 +198,41 @@ def remap_single_linkage_tree(tree, internal_to_raw, outliers):
     return tree
 
 
+def cluster_exemplar_indices(condensed_tree, selected_clusters, num_points):
+    """Indices of each selected cluster's exemplars, as in hdbscan's ``exemplars_``.
+
+    The exemplars of a selected cluster are the points that stay in each leaf
+    cluster below it until the leaf's largest lambda.
+    """
+    is_point = condensed_tree["child"] < num_points
+    cluster_rows = condensed_tree[~is_point]
+    child_clusters = {}
+    for parent, child in zip(cluster_rows["parent"], cluster_rows["child"]):
+        child_clusters.setdefault(parent, []).append(child)
+
+    point_rows = condensed_tree[is_point]
+    point_rows = point_rows[np.argsort(point_rows["parent"], kind="stable")]
+    leaf_ids, leaf_starts = np.unique(point_rows["parent"], return_index=True)
+    leaf_ends = np.append(leaf_starts[1:], len(point_rows))
+
+    exemplars = []
+    for cluster in np.sort(selected_clusters):
+        leaves, stack = [], [cluster]
+        while stack:
+            node = stack.pop()
+            if node in child_clusters:
+                stack.extend(child_clusters[node])
+            else:
+                leaves.append(node)
+        parts = []
+        for leaf in sorted(leaves):
+            leaf_position = np.searchsorted(leaf_ids, leaf)
+            rows = point_rows[leaf_starts[leaf_position] : leaf_ends[leaf_position]]
+            parts.append(rows["child"][rows["lambda_val"] == rows["lambda_val"].max()])
+        exemplars.append(np.concatenate(parts))
+    return exemplars
+
+
 def fast_hdbscan(
     data,
     data_labels=None,
@@ -218,6 +255,8 @@ def fast_hdbscan(
     validate_cannot_link=True,
     cannot_link_groups=None,
     metric_kwds=None,
+    *,
+    return_selected_clusters=False,
 ):
     """
     Run the full HDBSCAN pipeline: MST construction, condensed tree
@@ -301,7 +340,10 @@ def fast_hdbscan(
             neighbors,
             core_distances,
         )
-        return result[: (None if return_trees else 2)]
+        result = result[: (None if return_trees else 2)]
+        if return_selected_clusters:
+            return (*result, np.empty(0, dtype=np.intp))
+        return result
 
     minimum_spanning_tree, neighbors, core_distances = compute_minimum_spanning_tree(
         data,
@@ -317,23 +359,24 @@ def fast_hdbscan(
         metric_kwds=metric_kwds,
     )
 
-    return (
-        *clusters_from_spanning_tree(
-            minimum_spanning_tree,
-            data_labels=data_labels,
-            semi_supervised=semi_supervised,
-            ss_algorithm=ss_algorithm,
-            min_cluster_size=min_cluster_size,
-            cluster_selection_method=cluster_selection_method,
-            max_cluster_size=max_cluster_size,
-            allow_single_cluster=allow_single_cluster,
-            cluster_selection_epsilon=cluster_selection_epsilon,
-            cluster_selection_persistence=cluster_selection_persistence,
-            sample_weights=sample_weights,
-        ),
-        neighbors,
-        core_distances,
-    )[: (None if return_trees else 2)]
+    *clustering, selected_clusters = clusters_from_spanning_tree(
+        minimum_spanning_tree,
+        data_labels=data_labels,
+        semi_supervised=semi_supervised,
+        ss_algorithm=ss_algorithm,
+        min_cluster_size=min_cluster_size,
+        cluster_selection_method=cluster_selection_method,
+        max_cluster_size=max_cluster_size,
+        allow_single_cluster=allow_single_cluster,
+        cluster_selection_epsilon=cluster_selection_epsilon,
+        cluster_selection_persistence=cluster_selection_persistence,
+        sample_weights=sample_weights,
+        return_selected_clusters=True,
+    )
+    result = (*clustering, neighbors, core_distances)[: (None if return_trees else 2)]
+    if return_selected_clusters:
+        return (*result, np.asarray(selected_clusters, dtype=np.intp))
+    return result
 
 
 def compute_minimum_spanning_tree(
@@ -509,6 +552,8 @@ def clusters_from_spanning_tree(
     cluster_selection_epsilon=0.0,
     cluster_selection_persistence=0.0,
     sample_weights=None,
+    *,
+    return_selected_clusters=False,
 ):
     n_points = minimum_spanning_tree.shape[0] + 1
     sorted_mst = minimum_spanning_tree[
@@ -574,7 +619,10 @@ def clusters_from_spanning_tree(
         condensed_tree, selected_clusters, clusters
     )
 
-    return clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst
+    result = (clusters, membership_strengths, linkage_tree, condensed_tree, sorted_mst)
+    if return_selected_clusters:
+        return (*result, selected_clusters)
+    return result
 
 
 class HDBSCAN(ClusterMixin, BaseEstimator):
@@ -644,6 +692,11 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         Cluster labels.  ``-1`` indicates noise.
     probabilities_ : float64[:], shape (n_samples,)
         Cluster membership strengths in [0, 1].
+    exemplars_ : list of ndarray
+        For each cluster, the points at the heart of it, as in ``hdbscan``:
+        those that stay in a leaf cluster below it until the leaf's largest
+        lambda. ``exemplars_[k]`` holds only points with label ``k``. Needs
+        vector data.
     """
 
     def __init__(
@@ -796,10 +849,12 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             self._min_spanning_tree,
             self._neighbors,
             self._core_distances,
+            self._selected_clusters,
         ) = fast_hdbscan(
             clean_data,
             clean_data_labels,
             return_trees=True,
+            return_selected_clusters=True,
             sample_weights=sample_weight,
             **kwargs,
         )
@@ -814,6 +869,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             self._single_linkage_tree = remap_single_linkage_tree(
                 self._single_linkage_tree, internal_to_raw, outliers
             )
+            self._selected_clusters = self._selected_clusters + len(outliers)
             new_labels = np.full(X.shape[0], -1)
             new_labels[finite_index] = self.labels_
             self.labels_ = new_labels
@@ -888,6 +944,72 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             raise AttributeError(
                 "No minimum spanning tree was generated; try running fit first."
             )
+
+    @property
+    def exemplars_(self):
+        check_is_fitted(
+            self,
+            "_condensed_tree",
+            msg="You first need to fit the HDBSCAN model before accessing the exemplars",
+        )
+        if self._raw_data is None:
+            raise AttributeError("Exemplars need vector data, not metric='precomputed'.")
+        exemplar_indices = cluster_exemplar_indices(
+            self._condensed_tree, self._selected_clusters, len(self.labels_)
+        )
+        # cluster_selection_epsilon can leave part of a selected cluster, or all
+        # of it, as noise.
+        labeled_cluster_count = self.labels_.max() + 1
+        return [
+            self._raw_data[indices[self.labels_[indices] == label]]
+            for label, indices in enumerate(exemplar_indices[:labeled_cluster_count])
+        ]
+
+    def _cluster_members(self, cluster_id):
+        check_is_fitted(
+            self,
+            "labels_",
+            msg="You first need to fit the HDBSCAN model before asking for a cluster's representative",
+        )
+        if self._raw_data is None:
+            raise AttributeError(
+                "Cluster representatives need vector data, not metric='precomputed'."
+            )
+        if cluster_id == -1:
+            raise ValueError("Cluster -1 is noise and has no representative point.")
+        if not 0 <= cluster_id <= self.labels_.max():
+            raise ValueError(
+                f"There is no cluster {cluster_id}; labels go from 0 to {self.labels_.max()}."
+            )
+        mask = self.labels_ == cluster_id
+        return self._raw_data[mask], self.probabilities_[mask]
+
+    def weighted_cluster_centroid(self, cluster_id):
+        """Average of a cluster's points weighted by membership strength.
+
+        Assumes a euclidean metric, as in ``hdbscan``; use
+        ``weighted_cluster_medoid`` for other metrics.
+        """
+        cluster_data, strengths = self._cluster_members(cluster_id)
+        return np.average(cluster_data, weights=strengths, axis=0)
+
+    def weighted_cluster_medoid(self, cluster_id):
+        """Cluster point with the smallest strength-weighted distance to the rest.
+
+        Builds the cluster's full distance matrix with scikit-learn, as in
+        ``hdbscan``, so it needs memory quadratic in the cluster size and a
+        metric scikit-learn supports.
+        """
+        if not (callable(self.metric) or self.metric in SKLEARN_METRICS):
+            raise NotImplementedError(
+                f"weighted_cluster_medoid needs a metric scikit-learn knows; "
+                f"{self.metric!r} is not one. Use weighted_cluster_centroid instead."
+            )
+        cluster_data, strengths = self._cluster_members(cluster_id)
+        distances = pairwise_distances(
+            cluster_data, metric=self.metric, **(self.metric_kwds or {})
+        )
+        return cluster_data[np.argmin((distances * strengths).sum(axis=1))]
 
 
 class PLSCAN(ClusterMixin, BaseEstimator):
