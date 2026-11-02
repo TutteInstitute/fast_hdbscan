@@ -257,6 +257,7 @@ def fast_hdbscan(
     metric_kwds=None,
     *,
     return_selected_clusters=False,
+    cluster_selection_epsilon_max=np.inf,
 ):
     """
     Run the full HDBSCAN pipeline: MST construction, condensed tree
@@ -304,6 +305,15 @@ def fast_hdbscan(
     ):
         raise ValueError(
             "Cluster selection epsilon must be a positive floating point number!"
+        )
+    if (
+        not isinstance(cluster_selection_epsilon_max, numbers.Real)
+        or isinstance(cluster_selection_epsilon_max, bool)
+        or not cluster_selection_epsilon_max >= cluster_selection_epsilon
+    ):
+        raise ValueError(
+            "Cluster selection epsilon max must be a number no smaller than "
+            "cluster selection epsilon!"
         )
     if (
         not np.issubdtype(type(cluster_selection_persistence), np.floating)
@@ -371,6 +381,7 @@ def fast_hdbscan(
         cluster_selection_epsilon=cluster_selection_epsilon,
         cluster_selection_persistence=cluster_selection_persistence,
         sample_weights=sample_weights,
+        cluster_selection_epsilon_max=cluster_selection_epsilon_max,
         return_selected_clusters=True,
     )
     result = (*clustering, neighbors, core_distances)[: (None if return_trees else 2)]
@@ -554,6 +565,7 @@ def clusters_from_spanning_tree(
     sample_weights=None,
     *,
     return_selected_clusters=False,
+    cluster_selection_epsilon_max=np.inf,
 ):
     n_points = minimum_spanning_tree.shape[0] + 1
     sorted_mst = minimum_spanning_tree[
@@ -596,6 +608,7 @@ def clusters_from_spanning_tree(
                 cluster_tree,
                 max_cluster_size=max_cluster_size,
                 allow_single_cluster=allow_single_cluster,
+                cluster_selection_epsilon_max=cluster_selection_epsilon_max,
             )
     elif cluster_selection_method == "leaf":
         if cluster_tree.parent.shape[0] == 0:
@@ -660,6 +673,12 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         Upper bound on cluster size (EOM only).
     cluster_selection_epsilon : float
         DBSCAN-style epsilon threshold for cluster selection.
+    cluster_selection_epsilon_max : float
+        Clusters born at a distance above this are split, as in ``hdbscan``
+        (EOM only; no effect with ``'leaf'`` or ``semi_supervised``). Must
+        be at least ``cluster_selection_epsilon``. ``cluster_selection_epsilon``
+        merges clusters afterwards, so it can still select a cluster born
+        above this limit.
     cluster_selection_persistence : float
         Minimum persistence for a cluster to be selected.
     semi_supervised : bool
@@ -708,6 +727,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         allow_single_cluster=False,
         max_cluster_size=np.inf,
         cluster_selection_epsilon=0.0,
+        cluster_selection_epsilon_max=np.inf,
         cluster_selection_persistence=0.0,
         semi_supervised=False,
         ss_algorithm="bc",
@@ -727,6 +747,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.allow_single_cluster = allow_single_cluster
         self.max_cluster_size = max_cluster_size
         self.cluster_selection_epsilon = cluster_selection_epsilon
+        self.cluster_selection_epsilon_max = cluster_selection_epsilon_max
         self.cluster_selection_persistence = cluster_selection_persistence
         self.semi_supervised = semi_supervised
         self.ss_algorithm = ss_algorithm
