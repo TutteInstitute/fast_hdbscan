@@ -50,11 +50,32 @@ def test_module_does_not_import_hdbscan(module):
     assert not any(name.split(".")[0] == "hdbscan" for name in imported)
 
 
-def test_get_clusters_returns_one_label_per_point(model):
-    tree = model.single_linkage_tree_
-    labels = tree.get_clusters(0.5, min_cluster_size=5)
-    assert labels.shape == (X.shape[0],)
-    assert labels.max() >= 0
+def same_partition(a, b):
+    """True when two label vectors group the points the same way, noise included."""
+    pairs = set(zip(a.tolist(), b.tolist()))
+    return len(pairs) == len(set(a.tolist())) == len(set(b.tolist())) and all(
+        (x == -1) == (y == -1) for x, y in pairs
+    )
+
+
+@pytest.mark.parametrize("cut", [0.2, 0.5, 1.0])
+@pytest.mark.parametrize("min_cluster_size", [2, 5, 20])
+def test_get_clusters_matches_scipy_components(model, cut, min_cluster_size):
+    from scipy.cluster.hierarchy import fcluster
+
+    linkage = model._single_linkage_tree
+    components = fcluster(linkage, t=cut, criterion="distance")
+    sizes = np.bincount(components)
+    expected = np.where(sizes[components] >= min_cluster_size, components, -1)
+
+    labels = model.single_linkage_tree_.get_clusters(cut, min_cluster_size)
+    assert np.issubdtype(labels.dtype, np.integer)
+    assert same_partition(labels, expected)
+
+
+def test_get_clusters_above_root_is_one_cluster(model):
+    labels = model.single_linkage_tree_.get_clusters(np.inf, min_cluster_size=5)
+    np.testing.assert_array_equal(labels, np.zeros(X.shape[0]))
 
 
 def test_numpy_output_formats(model):
