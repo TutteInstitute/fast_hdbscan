@@ -29,9 +29,8 @@ def _bfs_from_cluster_tree(tree, bfs_root):
     return result
 
 
-def _recurse_leaf_dfs(cluster_tree, current_node):
-    # Iterative depth-first walk (leaves in left-to-right order), so deep
-    # trees do not hit Python's recursion limit.
+def _leaves_in_dfs_order(cluster_tree, current_node):
+    # Iterative rather than recursive, so deep trees do not hit Python's recursion limit.
     leaves = []
     to_visit = [current_node]
     while to_visit:
@@ -51,7 +50,7 @@ def _get_leaves(condensed_tree):
         return [condensed_tree['parent'].min()]
 
     root = cluster_tree['parent'].min()
-    return _recurse_leaf_dfs(cluster_tree, root)
+    return _leaves_in_dfs_order(cluster_tree, root)
 
 
 class CondensedTree(object):
@@ -60,9 +59,9 @@ class CondensedTree(object):
 
     Parameters
     ----------
-    condensed_tree_array : numpy recarray from :class:`~hdbscan.HDBSCAN`
+    condensed_tree_array : numpy recarray from :class:`~fast_hdbscan.HDBSCAN`
         The raw numpy rec array version of the condensed tree as produced
-        internally by hdbscan.
+        internally by fast_hdbscan.
 
     cluster_selection_method : string, optional (default 'eom')
         The method of selecting clusters. One of 'eom' or 'leaf'

@@ -11,7 +11,12 @@ from sklearn.preprocessing import StandardScaler
 import fast_hdbscan.hdbscan
 import fast_hdbscan.plots
 from fast_hdbscan import HDBSCAN
-from fast_hdbscan.plots import CondensedTree, MinimumSpanningTree, SingleLinkageTree
+from fast_hdbscan.plots import (
+    CondensedTree,
+    MinimumSpanningTree,
+    SingleLinkageTree,
+    _get_leaves,
+)
 
 X, _ = make_blobs(n_samples=200, random_state=10)
 X = StandardScaler().fit_transform(X)
@@ -20,16 +25,6 @@ X = StandardScaler().fit_transform(X)
 @pytest.fixture(scope="module")
 def model():
     return HDBSCAN(min_cluster_size=10).fit(X)
-
-
-@pytest.fixture
-def plt():
-    matplotlib = pytest.importorskip("matplotlib")
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    yield plt
-    plt.close("all")
 
 
 def test_tree_attributes_use_fast_hdbscan_classes(model):
@@ -51,11 +46,12 @@ def test_module_does_not_import_hdbscan(module):
 
 
 def same_partition(a, b):
-    """True when two label vectors group the points the same way, noise included."""
-    pairs = set(zip(a.tolist(), b.tolist()))
-    return len(pairs) == len(set(a.tolist())) == len(set(b.tolist())) and all(
-        (x == -1) == (y == -1) for x, y in pairs
+    label_pairs = set(zip(a.tolist(), b.tolist()))
+    labels_match_one_to_one = (
+        len(label_pairs) == len(set(a.tolist())) == len(set(b.tolist()))
     )
+    noise_matches = all((x == -1) == (y == -1) for x, y in label_pairs)
+    return labels_match_one_to_one and noise_matches
 
 
 @pytest.mark.parametrize("cut", [0.2, 0.5, 1.0])
@@ -133,14 +129,40 @@ def test_single_linkage_tree_plot(model, plt):
 def test_minimum_spanning_tree_plot(model, plt):
     model.minimum_spanning_tree_.plot(edge_cmap="Reds")
 
-    # More than 2 dimensions goes through the TSNE projection.
+
+def test_minimum_spanning_tree_plot_projects_high_dimensional_data(plt):
     H, _ = make_blobs(n_samples=50, random_state=0, n_features=10)
     HDBSCAN(min_cluster_size=5).fit(H).minimum_spanning_tree_.plot(
         edge_cmap="Reds", vary_line_width=False, colorbar=False
     )
 
 
-# Parity with hdbscan on the same tree arrays. Skipped when hdbscan is absent.
+def recursive_leaves(cluster_tree, node):
+    children = cluster_tree[cluster_tree["parent"] == node]["child"]
+    if len(children) == 0:
+        return [node]
+    return [leaf for child in children for leaf in recursive_leaves(cluster_tree, child)]
+
+
+def test_get_leaves_matches_recursive_order(model):
+    dtype = model._condensed_tree.dtype
+    #        10
+    #      /    \
+    #    11      12
+    #   /  \    /  \
+    #  13  14  15  16
+    #     /  \
+    #    17  18
+    edges = [(10, 11), (10, 12), (11, 13), (11, 14), (12, 15), (12, 16), (14, 17), (14, 18)]
+    tree = np.array([(p, c, 1.0, 5) for p, c in edges], dtype=dtype)
+    assert _get_leaves(tree) == [13, 17, 18, 15, 16]
+
+    cluster_tree = model._condensed_tree[model._condensed_tree["child_size"] > 1]
+    root = cluster_tree["parent"].min()
+    assert _get_leaves(model._condensed_tree) == recursive_leaves(cluster_tree, root)
+
+
+# --- Parity with hdbscan on the same tree arrays (skipped without hdbscan)
 
 
 def test_condensed_tree_plot_data_matches_hdbscan(model):
