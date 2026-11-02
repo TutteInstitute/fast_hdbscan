@@ -219,3 +219,47 @@ def test_approximation_graph_plot():
         g.plot(positions=X, node_color=X[:, 0], edge_color="k", node_alpha=0.5)
     finally:
         plt.close("all")
+
+
+# ApproximationGraph point ids are original row indices, like the edge endpoints.
+# These need noise points, so that dropping them shifts the row indices.
+
+X_noisy = np.concatenate(
+    (X, np.random.RandomState(0).uniform(X.min(), X.max(), size=(40, 2)))
+)
+c_noisy = HDBSCAN(min_samples=5, min_cluster_size=10).fit(X_noisy)
+
+
+def test_approximation_graph_point_ids_match_edge_endpoints():
+    b = BranchDetector().fit(c_noisy)
+    assert (c_noisy.labels_ == -1).any(), "fixture needs noise points for this test"
+    g = b.approximation_graph_
+    points, edges = g.to_numpy()
+    np.testing.assert_array_equal(points["id"], np.flatnonzero(g.point_mask))
+    endpoints = np.union1d(edges["parent"], edges["child"])
+    assert np.isin(endpoints, points["id"]).all()
+
+
+def test_approximation_graph_networkx_node_attributes():
+    pytest.importorskip("networkx")
+    b = BranchDetector().fit(c_noisy)
+    graph = b.approximation_graph_.to_networkx(feature_names=["x", "y"])
+    for node, attrs in graph.nodes(data=True):
+        assert attrs["label"] == b.labels_[node]
+        assert attrs["x"] == X_noisy[node, 0]
+        assert attrs["y"] == X_noisy[node, 1]
+
+
+def test_approximation_graph_plot_with_clustered_only_positions():
+    matplotlib = pytest.importorskip("matplotlib")
+    pytest.importorskip("networkx")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    g = BranchDetector().fit(c_noisy).approximation_graph_
+    try:
+        g.plot(positions=X_noisy[g.point_mask])
+    finally:
+        plt.close("all")
+    np.testing.assert_array_equal(g._xs[g.point_mask], X_noisy[g.point_mask, 0])
+    assert np.isnan(g._xs[~g.point_mask]).all()
