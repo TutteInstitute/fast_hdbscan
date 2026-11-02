@@ -693,7 +693,14 @@ def unselect_below_node(node, cluster_tree, selected_clusters):
 
 @numba.njit(fastmath=True, cache=NUMBA_CACHE)
 def eom_recursion(
-    node, cluster_tree, node_scores, node_sizes, selected_clusters, max_cluster_size
+    node,
+    cluster_tree,
+    node_scores,
+    node_sizes,
+    selected_clusters,
+    max_cluster_size,
+    node_birth_distances,
+    max_birth_distance,
 ):
     current_score = max(
         node_scores[node], 0.0
@@ -711,9 +718,15 @@ def eom_recursion(
             node_sizes,
             selected_clusters,
             max_cluster_size,
+            node_birth_distances,
+            max_birth_distance,
         )
 
-    if child_score_total > current_score or current_size > max_cluster_size:
+    if (
+        child_score_total > current_score
+        or current_size > max_cluster_size
+        or node_birth_distances[node] > max_birth_distance
+    ):
         return child_score_total
     else:
         selected_clusters[node] = True
@@ -723,7 +736,11 @@ def eom_recursion(
 
 @numba.njit(cache=NUMBA_CACHE)
 def extract_eom_clusters(
-    condensed_tree, cluster_tree, max_cluster_size=np.inf, allow_single_cluster=False
+    condensed_tree,
+    cluster_tree,
+    max_cluster_size=np.inf,
+    allow_single_cluster=False,
+    cluster_selection_epsilon_max=np.inf,
 ):
     node_scores = score_condensed_tree_nodes(condensed_tree)
     if len(cluster_tree.parent) > 0:
@@ -744,6 +761,17 @@ def extract_eom_clusters(
         return np.zeros(0, dtype=np.int64)
 
     cluster_tree_root = cluster_tree.parent.min()
+    # A cluster is born at distance 1 / lambda; the root, as in hdbscan, at the
+    # largest distance in the tree. lambda=0 comes from the infinite edges that
+    # join disconnected components, so it means an infinite distance.
+    node_birth_distances = {
+        node: (1.0 / lambda_val) if lambda_val > 0.0 else np.inf
+        for node, lambda_val in zip(cluster_tree.child, cluster_tree.lambda_val)
+    }
+    smallest_lambda = condensed_tree.lambda_val.min()
+    node_birth_distances[cluster_tree_root] = (
+        (1.0 / smallest_lambda) if smallest_lambda > 0.0 else np.inf
+    )
 
     if allow_single_cluster:
         eom_recursion(
@@ -753,6 +781,8 @@ def extract_eom_clusters(
             node_sizes,
             selected_clusters,
             max_cluster_size,
+            node_birth_distances,
+            cluster_selection_epsilon_max,
         )
     elif len(node_scores) > 1:
         root_children = cluster_tree.child[cluster_tree.parent == cluster_tree_root]
@@ -764,6 +794,8 @@ def extract_eom_clusters(
                 node_sizes,
                 selected_clusters,
                 max_cluster_size,
+                node_birth_distances,
+                cluster_selection_epsilon_max,
             )
 
     return np.asarray(
