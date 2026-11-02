@@ -191,10 +191,10 @@ def test_badargs():
 # --- Attribute output formats and plots
 
 
-def test_approximation_graph_output_formats():
+def test_approximation_graph_numpy_output():
     b = BranchDetector().fit(c)
     points, edges = b.approximation_graph_.to_numpy()
-    assert points.shape[0] <= X.shape[0]  # Excludes noise points
+    assert points.shape[0] <= X.shape[0]
     assert edges.shape[0] > 0
 
 
@@ -207,22 +207,13 @@ def test_approximation_graph_pandas_and_networkx():
     assert g.to_networkx().number_of_nodes() > 0
 
 
-def test_approximation_graph_plot():
-    matplotlib = pytest.importorskip("matplotlib")
-    pytest.importorskip("networkx")
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
+def test_approximation_graph_plot(plt):
     g = BranchDetector().fit(c).approximation_graph_
-    try:
-        g.plot(positions=X)
-        g.plot(positions=X, node_color=X[:, 0], edge_color="k", node_alpha=0.5)
-    finally:
-        plt.close("all")
+    g.plot(positions=X)
+    g.plot(positions=X, node_color=X[:, 0], edge_color="k", node_alpha=0.5)
 
 
-# ApproximationGraph point ids are original row indices, like the edge endpoints.
-# These need noise points, so that dropping them shifts the row indices.
+# Noise shifts row indices, so these check that point ids are row indices.
 
 X_noisy = np.concatenate(
     (X, np.random.RandomState(0).uniform(X.min(), X.max(), size=(40, 2)))
@@ -232,7 +223,7 @@ c_noisy = HDBSCAN(min_samples=5, min_cluster_size=10).fit(X_noisy)
 
 def test_approximation_graph_point_ids_match_edge_endpoints():
     b = BranchDetector().fit(c_noisy)
-    assert (c_noisy.labels_ == -1).any(), "fixture needs noise points for this test"
+    assert (c_noisy.labels_ == -1).any(), "c_noisy needs noise points for this test"
     g = b.approximation_graph_
     points, edges = g.to_numpy()
     np.testing.assert_array_equal(points["id"], np.flatnonzero(g.point_mask))
@@ -250,16 +241,8 @@ def test_approximation_graph_networkx_node_attributes():
         assert attrs["y"] == X_noisy[node, 1]
 
 
-def test_approximation_graph_plot_with_clustered_only_positions():
-    matplotlib = pytest.importorskip("matplotlib")
-    pytest.importorskip("networkx")
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
+def test_approximation_graph_plot_with_clustered_only_positions(plt):
     g = BranchDetector().fit(c_noisy).approximation_graph_
-    try:
-        g.plot(positions=X_noisy[g.point_mask])
-    finally:
-        plt.close("all")
+    g.plot(positions=X_noisy[g.point_mask])
     np.testing.assert_array_equal(g._xs[g.point_mask], X_noisy[g.point_mask, 0])
     assert np.isnan(g._xs[~g.point_mask]).all()
