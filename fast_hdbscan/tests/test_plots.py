@@ -120,6 +120,35 @@ def test_condensed_tree_plot(model, plt):
     model.condensed_tree_.plot(log_size=True, colorbar=False, cmap="none")
 
 
+def test_condensed_tree_plot_draws_sub_pixel_icicles(plt):
+    many_clusters, _ = make_blobs(
+        n_samples=300, centers=30, cluster_std=0.2, center_box=(-30, 30), random_state=0
+    )
+    tree = HDBSCAN(min_cluster_size=5).fit(many_clusters).condensed_tree_
+    fig, axis = plt.subplots(figsize=(2, 2), dpi=50)
+    tree.plot(axis=axis, colorbar=False, cmap="viridis")
+    fig.canvas.draw()
+
+    image = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].astype(int)
+    # icicles are coloured, split lines are black or antialiased gray
+    coloured = (image.max(axis=2) - image.min(axis=2)) > 20
+    bounds = tree.get_plot_data()["cluster_bounds"]
+    visible = []
+    for leaf in _get_leaves(tree._raw_tree):
+        left, right, birth, death = bounds[leaf]
+        (x_left, y_birth), (x_right, y_death) = axis.transData.transform(
+            [(left, birth), (right, death)]
+        )
+        # rows strictly between birth and death belong to this leaf only
+        rows = slice(image.shape[0] - int(y_birth) + 1, image.shape[0] - int(y_death) - 1)
+        if rows.stop - rows.start < 2:
+            continue
+        columns = slice(int(x_left), int(x_right) + 1)
+        visible.append(coloured[rows, columns].any())
+    assert len(visible) > 5
+    assert all(visible)
+
+
 def test_single_linkage_tree_plot(model, plt):
     model.single_linkage_tree_.plot(cmap="Reds")
     model.single_linkage_tree_.plot(
