@@ -1,6 +1,7 @@
 """Tests for the plotting classes ported from hdbscan.plots."""
 
 import ast
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -135,6 +136,25 @@ def test_minimum_spanning_tree_plot_projects_high_dimensional_data(plt):
     HDBSCAN(min_cluster_size=5).fit(H).minimum_spanning_tree_.plot(
         edge_cmap="Reds", vary_line_width=False, colorbar=False
     )
+
+
+def test_project_to_2d_prefers_umap_when_installed(monkeypatch):
+    class FakeUMAP:
+        def fit_transform(self, data):
+            return np.full((data.shape[0], 2), 7.0)
+
+    fake_umap = type(sys)("umap")
+    fake_umap.UMAP = FakeUMAP
+    monkeypatch.setitem(sys.modules, "umap", fake_umap)
+
+    projection = fast_hdbscan.plots._project_to_2d(np.zeros((5, 10)))
+    assert np.all(projection == 7.0)
+
+
+def test_project_to_2d_falls_back_to_tsne_without_umap(monkeypatch):
+    monkeypatch.setitem(sys.modules, "umap", None)  # makes `import umap` raise ImportError
+    H, _ = make_blobs(n_samples=50, random_state=0, n_features=40)
+    assert fast_hdbscan.plots._project_to_2d(H).shape == (50, 2)
 
 
 def recursive_leaves(cluster_tree, node):

@@ -3,10 +3,12 @@
 # Original author: Leland McInnes <leland.mcinnes@gmail.com>
 # Original license: BSD 3 clause
 
+import numba
 import numpy as np
 
 from warnings import warn
 from .cluster_trees import get_cluster_labelling_at_cut
+from .variables import NUMBA_CACHE
 
 CB_LEFT = 0
 CB_RIGHT = 1
@@ -29,18 +31,35 @@ def _bfs_from_cluster_tree(tree, bfs_root):
     return result
 
 
-def _leaves_in_dfs_order(cluster_tree, current_node):
+@numba.njit(cache=NUMBA_CACHE)
+def _leaves_in_dfs_order(parents, children, root):
     # Iterative rather than recursive, so deep trees do not hit Python's recursion limit.
     leaves = []
-    to_visit = [current_node]
-    while to_visit:
+    to_visit = [root]
+    while len(to_visit) > 0:
         node = to_visit.pop()
-        children = cluster_tree[cluster_tree['parent'] == node]['child']
-        if len(children) == 0:
+        node_children = children[parents == node]
+        if node_children.shape[0] == 0:
             leaves.append(node)
         else:
-            to_visit.extend(children[::-1])
+            # Pushed in reverse so the first child is visited first
+            for i in range(node_children.shape[0] - 1, -1, -1):
+                to_visit.append(node_children[i])
     return leaves
+
+
+def _project_to_2d(data):
+    # UMAP when it is installed; otherwise TSNE, with PCA first on wide data
+    try:
+        from umap import UMAP
+    except ImportError:
+        from sklearn.decomposition import PCA
+        from sklearn.manifold import TSNE
+
+        if data.shape[1] > 32:
+            data = PCA(n_components=32).fit_transform(data)
+        return TSNE().fit_transform(data)
+    return UMAP().fit_transform(data)
 
 
 def _get_leaves(condensed_tree):
@@ -50,7 +69,9 @@ def _get_leaves(condensed_tree):
         return [condensed_tree['parent'].min()]
 
     root = cluster_tree['parent'].min()
-    return _leaves_in_dfs_order(cluster_tree, root)
+    parents = np.ascontiguousarray(cluster_tree['parent'], dtype=np.int64)
+    children = np.ascontiguousarray(cluster_tree['child'], dtype=np.int64)
+    return list(_leaves_in_dfs_order(parents, children, np.int64(root)))
 
 
 class CondensedTree(object):
@@ -807,17 +828,7 @@ class MinimumSpanningTree(object):
             axis = plt.gca()
 
         if self._data.shape[1] > 2:
-            from sklearn.decomposition import PCA
-            from sklearn.manifold import TSNE
-
-            # Get a 2D projection; if we have a lot of dimensions use PCA first
-            if self._data.shape[1] > 32:
-                # Use PCA to get down to 32 dimension
-                data_for_projection = PCA(n_components=32).fit_transform(self._data)
-            else:
-                data_for_projection = self._data.copy()
-
-            projection = TSNE().fit_transform(data_for_projection)
+            projection = _project_to_2d(self._data)
         else:
             projection = self._data.copy()
 
