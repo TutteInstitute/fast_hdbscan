@@ -120,6 +120,32 @@ def test_condensed_tree_plot(model, plt):
     model.condensed_tree_.plot(log_size=True, colorbar=False, cmap="none")
 
 
+def test_condensed_tree_plot_axis_fits_icicles(model, plt):
+    data = model.condensed_tree_.get_plot_data()
+    centers = np.asarray(data["bar_centers"])
+    widths = np.asarray(data["bar_widths"])
+    bottoms = np.asarray(data["bar_bottoms"])
+    axis = model.condensed_tree_.plot(colorbar=False)
+
+    (x_min, y_min), (x_max, y_max) = axis.dataLim.get_points()
+    np.testing.assert_allclose(
+        [x_min, x_max], [(centers - widths / 2).min(), (centers + widths / 2).max()]
+    )
+    np.testing.assert_allclose(
+        [y_min, y_max], [bottoms.min(), (bottoms + data["bar_tops"]).max()]
+    )
+    assert axis.get_ylim()[1] == 0.0
+
+    icicles = axis.collections[0]
+    extents = np.array(
+        [[*path.vertices.min(axis=0), *path.vertices.max(axis=0)] for path in icicles.get_paths()]
+    )
+    expected = np.column_stack(
+        [centers - widths / 2, bottoms, centers + widths / 2, bottoms + data["bar_tops"]]
+    )
+    np.testing.assert_allclose(extents, expected)
+
+
 def test_condensed_tree_plot_draws_sub_pixel_icicles(plt):
     many_clusters, _ = make_blobs(
         n_samples=300, centers=30, cluster_std=0.2, center_box=(-30, 30), random_state=0
