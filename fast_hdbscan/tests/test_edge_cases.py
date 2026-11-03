@@ -68,3 +68,13 @@ class TestEdgeCaseInputs:
         ).fit_predict(X)
         n_clusters = len(set(labels) - {-1})
         assert n_clusters <= 1
+
+    def test_persistence_without_cluster_splits(self):
+        """Persistence on a condensed tree with no splits leaves it unchanged."""
+        X, _ = make_blobs(300, centers=4, cluster_std=1.5, random_state=0)
+        baseline = HDBSCAN(min_cluster_size=15).fit(X)
+        assert len(baseline._condensed_tree["child"]) == len(X)
+
+        model = HDBSCAN(min_cluster_size=15, cluster_selection_persistence=0.01).fit(X)
+        np.testing.assert_array_equal(model._condensed_tree, baseline._condensed_tree)
+        np.testing.assert_array_equal(model.labels_, baseline.labels_)
