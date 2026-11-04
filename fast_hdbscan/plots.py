@@ -15,6 +15,8 @@ CB_RIGHT = 1
 CB_BOTTOM = 2
 CB_TOP = 3
 
+ICICLE_MIN_WIDTH_POINTS = 0.5
+
 
 def _bfs_from_cluster_tree(tree, bfs_root):
     """
@@ -332,6 +334,7 @@ class CondensedTree(object):
         """
         try:
             import matplotlib.pyplot as plt
+            from matplotlib.collections import LineCollection, PolyCollection
         except ImportError:
             raise ImportError(
                 'You must install the matplotlib library to plot the condensed tree.'
@@ -352,23 +355,36 @@ class CondensedTree(object):
         if axis is None:
             axis = plt.gca()
 
-        axis.bar(
-            plot_data['bar_centers'],
-            plot_data['bar_tops'],
-            bottom=plot_data['bar_bottoms'],
-            width=plot_data['bar_widths'],
-            color=bar_colors,
-            align='center',
-            linewidth=0
+        bar_centers = np.asarray(plot_data['bar_centers'])
+        bar_widths = np.asarray(plot_data['bar_widths'])
+        bar_bottoms = np.asarray(plot_data['bar_bottoms'])
+        # 'bar_tops' holds bar heights, as the key name comes from hdbscan's API
+        bar_heights = np.asarray(plot_data['bar_tops'])
+        bar_lefts = bar_centers - bar_widths / 2
+        bar_rights = bar_centers + bar_widths / 2
+        bar_tops = bar_bottoms + bar_heights
+        icicles = PolyCollection(
+            [
+                [(left, bottom), (right, bottom), (right, top), (left, top)]
+                for left, right, bottom, top in zip(bar_lefts, bar_rights, bar_bottoms, bar_tops)
+            ],
+            facecolors=bar_colors,
+            # The edge has a fixed width in points, so icicles narrower than a
+            # pixel at the figure's DPI still render instead of vanishing.
+            edgecolors=bar_colors,
+            linewidths=ICICLE_MIN_WIDTH_POINTS,
         )
+        # like axis.bar: no autoscale margin past the bar bottoms (lambda = 0)
+        icicles.sticky_edges.y.extend(bar_bottoms)
+        axis.add_collection(icicles)
 
-        drawlines = []
-        for xs, ys in zip(plot_data['line_xs'], plot_data['line_ys']):
-            drawlines.append(xs)
-            drawlines.append(ys)
-        axis.plot(*drawlines, color='black', linewidth=1)
-        # for xs, ys in zip(plot_data['line_xs'], plot_data['line_ys']):
-        #     axis.plot(xs, ys, color='black', linewidth=1)
+        splits = LineCollection(
+            [list(zip(xs, ys)) for xs, ys in zip(plot_data['line_xs'], plot_data['line_ys'])],
+            colors='black',
+            linewidths=1,
+        )
+        axis.add_collection(splits)
+        axis.autoscale_view()
 
         if select_clusters:
             try:
