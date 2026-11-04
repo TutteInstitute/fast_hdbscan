@@ -6,12 +6,7 @@ from fast_hdbscan import HDBSCAN
 from fast_hdbscan.branches import compute_centrality
 from fast_hdbscan.sub_clusters import SubClusterDetector, find_sub_clusters
 
-try:
-    from hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
-
-    HAVE_HDBSCAN = True
-except ModuleNotFoundError:
-    HAVE_HDBSCAN = False
+from fast_hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
 
 
 def make_branches(points_per_branch=30):
@@ -66,7 +61,6 @@ def check_detected_groups(c, n_clusters=3, n_subs=6, overridden=False):
 # --- Detecting SubClusters
 
 
-@pytest.mark.skipif(not HAVE_HDBSCAN, reason="Requires HDBSCAN")
 def test_attributes():
     b = SubClusterDetector(lens_values=centrality).fit(c)
     check_detected_groups(b, n_clusters=2, n_subs=7)

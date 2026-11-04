@@ -7,12 +7,7 @@ import numpy as np
 from sklearn.exceptions import NotFittedError
 from fast_hdbscan import HDBSCAN, BranchDetector, find_branch_sub_clusters
 
-try:
-    from hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
-
-    HAVE_HDBSCAN = True
-except ModuleNotFoundError:
-    HAVE_HDBSCAN = False
+from fast_hdbscan.plots import ApproximationGraph, CondensedTree, SingleLinkageTree
 
 
 def make_branches(points_per_branch=30):
@@ -66,7 +61,6 @@ def check_detected_groups(c, n_clusters=3, n_branches=6, overridden=False):
 # --- Detecting Branches
 
 
-@pytest.mark.skipif(not HAVE_HDBSCAN, reason="Requires HDBSCAN")
 def test_attributes():
     b = BranchDetector().fit(c)
     check_detected_groups(b, n_clusters=2, n_branches=5)
@@ -192,3 +186,65 @@ def test_badargs():
             c,
             cluster_selection_method="something_else",
         )
+
+
+# --- Attribute output formats and plots
+
+
+def test_approximation_graph_numpy_output():
+    b = BranchDetector().fit(c)
+    points, edges = b.approximation_graph_.to_numpy()
+    assert points.shape[0] <= X.shape[0]
+    assert edges.shape[0] > 0
+
+
+def test_approximation_graph_pandas_and_networkx():
+    pytest.importorskip("pandas")
+    pytest.importorskip("networkx")
+    g = BranchDetector().fit(c).approximation_graph_
+    points, edges = g.to_pandas()
+    assert len(points) > 0 and len(edges) > 0
+    assert g.to_networkx().number_of_nodes() > 0
+
+
+def test_approximation_graph_plot(plt):
+    g = BranchDetector().fit(c).approximation_graph_
+    g.plot(positions=X)
+    g.plot(positions=X, node_color=X[:, 0], edge_color="k", node_alpha=0.5)
+
+
+# Noise shifts row indices, so these check that point ids are row indices.
+
+X_noisy = np.concatenate(
+    (X, np.random.RandomState(0).uniform(X.min(), X.max(), size=(40, 2)))
+)
+c_noisy = HDBSCAN(min_samples=5, min_cluster_size=10).fit(X_noisy)
+
+
+def test_approximation_graph_point_ids_match_edge_endpoints():
+    b = BranchDetector().fit(c_noisy)
+    assert (c_noisy.labels_ == -1).any(), "c_noisy needs noise points for this test"
+    g = b.approximation_graph_
+    points, edges = g.to_numpy()
+    np.testing.assert_array_equal(points["id"], np.flatnonzero(g.point_mask))
+    endpoints = np.union1d(edges["parent"], edges["child"])
+    assert np.isin(endpoints, points["id"]).all()
+
+
+def test_approximation_graph_networkx_node_attributes():
+    pytest.importorskip("networkx")
+    b = BranchDetector().fit(c_noisy)
+    graph = b.approximation_graph_.to_networkx(feature_names=["x", "y"])
+    for node, attrs in graph.nodes(data=True):
+        assert attrs["label"] == b.labels_[node]
+        assert attrs["x"] == X_noisy[node, 0]
+        assert attrs["y"] == X_noisy[node, 1]
+
+
+def test_approximation_graph_plot_with_clustered_only_positions(plt):
+    g = BranchDetector().fit(c_noisy).approximation_graph_
+    g.plot(positions=X_noisy[g.point_mask])
+    np.testing.assert_array_equal(g._xs[g.point_mask], X_noisy[g.point_mask, 0])
+    np.testing.assert_array_equal(g._ys[g.point_mask], X_noisy[g.point_mask, 1])
+    assert np.isnan(g._xs[~g.point_mask]).all()
+    assert np.isnan(g._ys[~g.point_mask]).all()
