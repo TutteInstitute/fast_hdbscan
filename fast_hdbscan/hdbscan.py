@@ -37,6 +37,8 @@ from .layer_clusters import build_cluster_layers, build_layer_cluster_tree
 
 from .plots import CondensedTree, SingleLinkageTree, MinimumSpanningTree
 
+_REPRODUCIBLE_KNN_SEED = 0
+
 
 # Simplified version of sklearn's check_sample_weight
 def _check_sample_weight(
@@ -579,6 +581,7 @@ def compute_minimum_spanning_tree(
             cannot_link=cannot_link,
             validate_cannot_link=validate_cannot_link,
             cannot_link_groups=cannot_link_groups,
+            random_state=_REPRODUCIBLE_KNN_SEED if reproducible else None,
         )
 
     # metric == "euclidean"
@@ -749,7 +752,8 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         Semi-supervised algorithm: ``'bc'`` or ``'bc_simple'``.
     reproducible : bool
         If True, use deterministic algorithms (Borůvka only; Kruskal
-        is always deterministic).
+        is always deterministic). When the approximate KNN graph
+        (pynndescent) is used, it is built with a fixed seed.
     metric : str
         ``'euclidean'``, ``'precomputed'``, or any pynndescent metric.
     algorithm : str
