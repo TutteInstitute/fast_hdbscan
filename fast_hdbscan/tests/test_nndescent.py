@@ -380,3 +380,42 @@ class TestErrorHandling:
         params = model.get_params()
         assert "metric_kwds" in params
         assert params["metric_kwds"] == {"some_key": 42}
+
+
+@pytest.mark.parametrize("metric, n_features", [("cosine", 10), ("euclidean", 40)])
+def test_reproducible_mst_on_pynndescent_path(metric, n_features):
+    # euclidean with more than 30 features also goes through pynndescent
+    from fast_hdbscan.hdbscan import compute_minimum_spanning_tree
+
+    X, _ = make_blobs(
+        300, n_features=n_features, centers=4, cluster_std=4.0, random_state=0
+    )
+    X = X.astype(np.float32)
+    first_edges = compute_minimum_spanning_tree(
+        X, min_samples=5, reproducible=True, metric=metric
+    )[0]
+    for _ in range(8):
+        edges = compute_minimum_spanning_tree(
+            X, min_samples=5, reproducible=True, metric=metric
+        )[0]
+        np.testing.assert_array_equal(edges, first_edges)
+
+
+@pytest.mark.parametrize("reproducible, expected_random_state", [(True, 0), (False, None)])
+def test_reproducible_seeds_pynndescent(monkeypatch, reproducible, expected_random_state):
+    import fast_hdbscan.nndescent as nndescent_module
+    from fast_hdbscan.hdbscan import compute_minimum_spanning_tree
+
+    received = {}
+    real = nndescent_module.compute_mst_from_knn_graph
+
+    def spy(*args, **kwargs):
+        received["random_state"] = kwargs.get("random_state")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(nndescent_module, "compute_mst_from_knn_graph", spy)
+    X, _ = make_blobs(100, n_features=5, centers=3, random_state=0)
+    compute_minimum_spanning_tree(
+        X.astype(np.float32), min_samples=5, reproducible=reproducible, metric="cosine"
+    )
+    assert received["random_state"] == expected_random_state
