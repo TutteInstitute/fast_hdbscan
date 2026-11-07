@@ -810,6 +810,10 @@ def extract_eom_clusters(
 @numba.njit(cache=NUMBA_CACHE)
 def simplify_hierarchy(condensed_tree, persistence_threshold):
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
+    # no cluster splits means there is no leaf to prune
+    if cluster_tree.parent.shape[0] == 0:
+        return condensed_tree
+
     n_points = condensed_tree.parent[0]
     n_nodes = cluster_tree.child[-1] + 1
 
