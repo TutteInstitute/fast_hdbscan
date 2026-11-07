@@ -36,6 +36,7 @@ from .cluster_trees import (
 from .layer_clusters import build_cluster_layers, build_layer_cluster_tree
 
 from .plots import CondensedTree, SingleLinkageTree, MinimumSpanningTree
+from .prediction import PredictionData
 
 
 # Simplified version of sklearn's check_sample_weight
@@ -766,6 +767,12 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         unconstrained).  Mutually exclusive with ``cannot_link``.
     metric_kwds : dict or None
         Keyword arguments for the distance metric (pynndescent only).
+    prediction_data : bool
+        If True, keep what ``fast_hdbscan.prediction.approximate_predict`` and
+        ``approximate_predict_scores`` need to place new points in the fitted
+        clustering. Same as calling ``generate_prediction_data()`` after
+        ``fit``. Only supports ``metric="euclidean"`` without
+        ``sample_weight``.
 
     Attributes
     ----------
@@ -788,6 +795,8 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         those that stay in a leaf cluster below it until the leaf's largest
         lambda. ``exemplars_[k]`` holds only points with label ``k``. Needs
         vector data.
+    prediction_data_ : PredictionData or None
+        Set by ``prediction_data=True`` or ``generate_prediction_data()``.
     """
 
     def __init__(
@@ -811,6 +820,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         validate_cannot_link=True,
         cannot_link_groups=None,
         metric_kwds=None,
+        prediction_data=False,
         # Removed **kwargs to comply with scikit-learn's API requirements
     ):
         self.min_cluster_size = min_cluster_size
@@ -831,6 +841,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
         self.validate_cannot_link = validate_cannot_link
         self.cannot_link_groups = cannot_link_groups
         self.metric_kwds = metric_kwds
+        self.prediction_data = prediction_data
 
     def fit(self, X, y=None, sample_weight=None, **fit_params):
 
@@ -933,6 +944,7 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
                 clean_data_labels = y
 
         kwargs = self.get_params()
+        kwargs.pop("prediction_data")
 
         (
             self.labels_,
@@ -972,7 +984,46 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             new_probabilities[finite_index] = self.probabilities_
             self.probabilities_ = new_probabilities
 
+        self._finite_index = None if self._all_finite else finite_index
+        self._fit_with_sample_weight = sample_weight is not None
+        self.prediction_data_ = None
+        if self.prediction_data:
+            self.generate_prediction_data()
+
         return self
+
+    def generate_prediction_data(self):
+        """Build the data ``approximate_predict`` and
+        ``approximate_predict_scores`` need, for a model fit without
+        ``prediction_data=True``.
+        """
+        check_is_fitted(
+            self,
+            "_condensed_tree",
+            msg="You first need to fit the HDBSCAN model before generating prediction data",
+        )
+        if self.metric != "euclidean":
+            raise NotImplementedError(
+                "Prediction data is only supported for metric='euclidean'. Got: %r"
+                % self.metric
+            )
+        if self._fit_with_sample_weight:
+            raise NotImplementedError(
+                "Prediction data is not supported for models fit with sample_weight."
+            )
+        if self._finite_index is None:
+            data, raw_index = self._raw_data, np.arange(self._raw_data.shape[0])
+        else:
+            data, raw_index = self._raw_data[self._finite_index], self._finite_index
+        self.prediction_data_ = PredictionData(
+            data,
+            raw_index,
+            self._condensed_tree,
+            self._selected_clusters,
+            self._core_distances,
+            self.min_cluster_size if self.min_samples is None else self.min_samples,
+            self.cluster_selection_epsilon,
+        )
 
     def dbscan_clustering(self, epsilon):
         check_is_fitted(

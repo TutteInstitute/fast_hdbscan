@@ -1,5 +1,6 @@
 from .hdbscan import HDBSCAN, fast_hdbscan, PLSCAN
 from .branches import BranchDetector, find_branch_sub_clusters
+from .prediction import approximate_predict, approximate_predict_scores
 
 __all__ = [
     "HDBSCAN",
@@ -7,4 +8,6 @@ __all__ = [
     "PLSCAN",
     "BranchDetector",
     "find_branch_sub_clusters",
+    "approximate_predict",
+    "approximate_predict_scores",
 ]
