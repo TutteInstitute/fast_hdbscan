@@ -1072,15 +1072,11 @@ def get_point_membership_strength_vector(tree, clusters, labels):
 
 
 @numba.njit(cache=NUMBA_CACHE)
-def glosh_outlier_scores(parents, children, lambdas, num_points):
-    """GLOSH outlier score of each point from a condensed tree, as in hdbscan.
-
-    A point's score is ``(lambda_max - lambda_point) / lambda_max``, where
-    ``lambda_max`` is the largest lambda reached anywhere in the subtree of
-    the cluster the point falls out of. Cluster ids start at ``num_points``.
+def subtree_max_lambdas(parents, children, lambdas, num_points):
+    """Largest lambda reached anywhere in the subtree of each node of a
+    non-empty condensed tree, indexed by node id. Cluster ids start at
+    ``num_points``.
     """
-    if parents.shape[0] == 0:
-        return np.zeros(num_points)
     num_nodes = max(parents.max(), children.max()) + 1
     deaths = np.zeros(num_nodes)
     cluster_parent = np.full(num_nodes, -1, dtype=np.intp)
@@ -1096,6 +1092,21 @@ def glosh_outlier_scores(parents, children, lambdas, num_points):
         parent = cluster_parent[cluster]
         if parent >= 0 and deaths[cluster] > deaths[parent]:
             deaths[parent] = deaths[cluster]
+
+    return deaths
+
+
+@numba.njit(cache=NUMBA_CACHE)
+def glosh_outlier_scores(parents, children, lambdas, num_points):
+    """GLOSH outlier score of each point from a condensed tree, as in hdbscan.
+
+    A point's score is ``(lambda_max - lambda_point) / lambda_max``, where
+    ``lambda_max`` is the largest lambda reached anywhere in the subtree of
+    the cluster the point falls out of. Cluster ids start at ``num_points``.
+    """
+    if parents.shape[0] == 0:
+        return np.zeros(num_points)
+    deaths = subtree_max_lambdas(parents, children, lambdas, num_points)
 
     scores = np.zeros(num_points)
     for i in range(parents.shape[0]):
