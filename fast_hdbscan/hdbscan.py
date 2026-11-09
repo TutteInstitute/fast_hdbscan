@@ -726,8 +726,14 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
     min_cluster_size : int
         Minimum number of samples in a cluster.
     min_samples : int or None
-        Number of neighbors for core distance.  Defaults to
-        ``min_cluster_size`` if None.
+        Number of neighbors, not counting the point itself, used for the
+        core distance (as in the ``hdbscan`` library; ``min_samples=k`` here
+        matches ``sklearn.cluster.HDBSCAN(min_samples=k + 1)``).  Defaults to
+        ``min_cluster_size`` if None, so changing ``min_cluster_size`` also
+        changes the core distances.  Small changes of ``min_samples`` can drop
+        or merge selected clusters whose size is close to
+        ``min_cluster_size``; if particular clusters matter, check a few
+        nearby values.
     cluster_selection_method : str
         ``'eom'`` (excess of mass) or ``'leaf'``.
     allow_single_cluster : bool
