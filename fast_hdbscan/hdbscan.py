@@ -1401,6 +1401,9 @@ class PLSCAN(ClusterMixin, BaseEstimator):
         """
         import scipy.sparse
 
+        # Parameters may have been changed with set_params since __init__
+        self._validate_params()
+
         if self.metric == "precomputed":
             from .precomputed import validate_precomputed_sparse_graph
 
