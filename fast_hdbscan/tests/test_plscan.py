@@ -711,3 +711,5 @@ def test_plscan_combined_parameters():
         assert hasattr(model, "labels_")
         assert hasattr(model, "cluster_layers_")
         assert len(model.cluster_layers_) <= config.get("max_layers", 10)
+
+
