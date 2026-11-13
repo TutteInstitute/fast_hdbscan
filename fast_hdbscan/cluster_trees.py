@@ -1011,14 +1011,22 @@ def get_cluster_label_vector(
                 continue
             ds_union_by_rank(disjoint_set, parent, child)
 
+    if len(clusters) == 1:
+        # A point that is never a child is never unioned, so it does not
+        # reach the root branch below and its slot is never read.
+        max_lambda = tree.lambda_val[tree.parent == root_cluster].max()
+        point_lambdas = np.empty(root_cluster, dtype=tree.lambda_val.dtype)
+        for n in range(tree.child.shape[0]):
+            if tree.child[n] < root_cluster:
+                point_lambdas[tree.child[n]] = tree.lambda_val[n]
+
     for n in range(root_cluster):
         cluster = ds_find(disjoint_set, n)
         if cluster < root_cluster:
             result[n] = -1
         elif cluster == root_cluster:
             if len(clusters) == 1:
-                max_lambda = tree.lambda_val[tree.parent == cluster].max()
-                cur_lambda = tree.lambda_val[tree.child == n]
+                cur_lambda = point_lambdas[n]
                 if cluster_selection_epsilon > 0.0:
                     if cur_lambda >= 1 / cluster_selection_epsilon:
                         result[n] = cluster_label_map[cluster]
