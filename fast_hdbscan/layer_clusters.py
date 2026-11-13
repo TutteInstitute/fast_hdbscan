@@ -241,7 +241,7 @@ def compute_total_persistence(births, deaths, lambda_deaths):
 
         # Update persistence values
         for k in range(birth_idx, death_idx):
-            total_persistence[k] += death - birth * lambda_death
+            total_persistence[k] += (death - birth) * lambda_death
 
     return sizes, total_persistence
 
