@@ -689,9 +689,20 @@ def mask_condensed_tree(condensed_tree, mask):
 
 
 @numba.njit(cache=NUMBA_CACHE)
-def unselect_below_node(node, cluster_tree, selected_clusters):
-    for child in cluster_tree.child[cluster_tree.parent == node]:
-        unselect_below_node(child, cluster_tree, selected_clusters)
+def cluster_tree_children(node, cluster_tree, child_order, sorted_parents):
+    start = np.searchsorted(sorted_parents, node, side="left")
+    end = np.searchsorted(sorted_parents, node, side="right")
+    return cluster_tree.child[child_order[start:end]]
+
+
+@numba.njit(cache=NUMBA_CACHE)
+def unselect_below_node(
+    node, cluster_tree, selected_clusters, child_order, sorted_parents
+):
+    for child in cluster_tree_children(node, cluster_tree, child_order, sorted_parents):
+        unselect_below_node(
+            child, cluster_tree, selected_clusters, child_order, sorted_parents
+        )
         selected_clusters[child] = False
 
 
@@ -705,13 +716,15 @@ def eom_recursion(
     max_cluster_size,
     node_birth_distances,
     max_birth_distance,
+    child_order,
+    sorted_parents,
 ):
     current_score = max(
         node_scores[node], 0.0
     )  # floating point errors can make score negative!
     current_size = node_sizes[node]
 
-    children = cluster_tree.child[cluster_tree.parent == node]
+    children = cluster_tree_children(node, cluster_tree, child_order, sorted_parents)
     child_score_total = 0.0
 
     for child_node in children:
@@ -724,6 +737,8 @@ def eom_recursion(
             max_cluster_size,
             node_birth_distances,
             max_birth_distance,
+            child_order,
+            sorted_parents,
         )
 
     if (
@@ -734,7 +749,9 @@ def eom_recursion(
         return child_score_total
     else:
         selected_clusters[node] = True
-        unselect_below_node(node, cluster_tree, selected_clusters)
+        unselect_below_node(
+            node, cluster_tree, selected_clusters, child_order, sorted_parents
+        )
         return current_score
 
 
@@ -777,6 +794,10 @@ def extract_eom_clusters(
         (1.0 / smallest_lambda) if smallest_lambda > 0.0 else np.inf
     )
 
+    # A stable sort keeps children in row order, so the sum order is fixed.
+    child_order = np.argsort(cluster_tree.parent, kind="mergesort")
+    sorted_parents = cluster_tree.parent[child_order]
+
     if allow_single_cluster:
         eom_recursion(
             cluster_tree_root,
@@ -787,9 +808,13 @@ def extract_eom_clusters(
             max_cluster_size,
             node_birth_distances,
             cluster_selection_epsilon_max,
+            child_order,
+            sorted_parents,
         )
     elif len(node_scores) > 1:
-        root_children = cluster_tree.child[cluster_tree.parent == cluster_tree_root]
+        root_children = cluster_tree_children(
+            cluster_tree_root, cluster_tree, child_order, sorted_parents
+        )
         for child_node in root_children:
             eom_recursion(
                 child_node,
@@ -800,6 +825,8 @@ def extract_eom_clusters(
                 max_cluster_size,
                 node_birth_distances,
                 cluster_selection_epsilon_max,
+                child_order,
+                sorted_parents,
             )
 
     return np.asarray(
