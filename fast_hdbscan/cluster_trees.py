@@ -1012,8 +1012,7 @@ def get_cluster_label_vector(
             ds_union_by_rank(disjoint_set, parent, child)
 
     if len(clusters) == 1:
-        # A point that is never a child is never unioned, so it does not
-        # reach the root branch below and its slot is never read.
+        # A point that is never a child is never unioned, so its slot is never read.
         max_lambda = tree.lambda_val[tree.parent == root_cluster].max()
         point_lambdas = np.empty(root_cluster, dtype=tree.lambda_val.dtype)
         for n in range(tree.child.shape[0]):
