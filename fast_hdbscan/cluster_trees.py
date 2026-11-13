@@ -794,7 +794,7 @@ def extract_eom_clusters(
         (1.0 / smallest_lambda) if smallest_lambda > 0.0 else np.inf
     )
 
-    # A stable sort keeps children in row order, so eom_recursion sums them in a fixed order.
+    # A stable sort keeps children in row order, so the sum order is fixed.
     child_order = np.argsort(cluster_tree.parent, kind="mergesort")
     sorted_parents = cluster_tree.parent[child_order]
 
