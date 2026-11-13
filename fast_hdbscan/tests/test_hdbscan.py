@@ -179,11 +179,30 @@ def test_hdbscan_allow_single_cluster_with_epsilon():
     assert counts[unique_labels == -1] == 69
 
     # An epsilon of 0.2 will produce 2 noise points and 2 labels
-    # Allow single cluster does not prevent applying the epsilon threshold.
-    c = HDBSCAN(min_cluster_size=5, cluster_selection_epsilon=0.2).fit(no_structure)
+    c = HDBSCAN(
+        min_cluster_size=5,
+        cluster_selection_epsilon=0.2,
+        allow_single_cluster=True,
+    ).fit(no_structure)
     unique_labels, counts = np.unique(c.labels_, return_counts=True)
     assert len(unique_labels) == 2
     assert counts[unique_labels == -1] == 2
+
+
+def test_hdbscan_epsilon_does_not_select_root_without_allow_single_cluster():
+    X_three_blobs, _ = make_blobs(
+        n_samples=300,
+        centers=[[0, 0], [10, 0], [0, 10]],
+        cluster_std=1.0,
+        random_state=0,
+    )
+    params = dict(min_cluster_size=15, cluster_selection_epsilon=50.0)
+
+    labels = HDBSCAN(**params).fit(X_three_blobs).labels_
+    assert len(set(labels) - {-1}) == 2
+
+    labels = HDBSCAN(allow_single_cluster=True, **params).fit(X_three_blobs).labels_
+    assert len(set(labels) - {-1}) == 1
 
 
 def test_hdbscan_max_cluster_size():

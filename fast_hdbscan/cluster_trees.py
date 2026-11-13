@@ -899,7 +899,9 @@ def simplify_hierarchy(condensed_tree, persistence_threshold):
 
 
 @numba.njit(cache=NUMBA_CACHE)
-def cluster_epsilon_search(clusters, cluster_tree, min_epsilon=0.0):
+def cluster_epsilon_search(
+    clusters, cluster_tree, min_epsilon=0.0, allow_single_cluster=False
+):
     selected = list()
     # only way to create a typed empty set
     processed = {np.int64(0)}
@@ -922,7 +924,9 @@ def cluster_epsilon_search(clusters, cluster_tree, min_epsilon=0.0):
         death_eps = (1.0 / lam) if lam > 0.0 else np.inf
         if death_eps < min_epsilon:
             if cluster not in processed:
-                parent = traverse_upwards(cluster_tree, min_epsilon, root, cluster)
+                parent = traverse_upwards(
+                    cluster_tree, min_epsilon, root, cluster, allow_single_cluster
+                )
                 selected.append(parent)
                 processed |= segments_in_branch(parents, children, parent)
         else:
@@ -931,10 +935,10 @@ def cluster_epsilon_search(clusters, cluster_tree, min_epsilon=0.0):
 
 
 @numba.njit(cache=NUMBA_CACHE)
-def traverse_upwards(cluster_tree, min_epsilon, root, segment):
+def traverse_upwards(cluster_tree, min_epsilon, root, segment, allow_single_cluster):
     parent = cluster_tree.parent[cluster_tree.child == segment][0]
     if parent == root:
-        return root
+        return root if allow_single_cluster else segment
     # Same lambda=0 guard as cluster_epsilon_search: bridge edges have
     # lambda=0 (distance=inf), so 1/lambda would divide by zero.
     parent_lam = cluster_tree.lambda_val[cluster_tree.child == parent][0]
@@ -942,7 +946,9 @@ def traverse_upwards(cluster_tree, min_epsilon, root, segment):
     if parent_death_eps >= min_epsilon:
         return parent
     else:
-        return traverse_upwards(cluster_tree, min_epsilon, root, parent)
+        return traverse_upwards(
+            cluster_tree, min_epsilon, root, parent, allow_single_cluster
+        )
 
 
 @numba.njit(cache=NUMBA_CACHE)
