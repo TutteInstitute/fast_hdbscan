@@ -689,6 +689,7 @@ def clusters_from_spanning_tree(
             selected_clusters,
             cluster_tree,
             min_epsilon=cluster_selection_epsilon,
+            allow_single_cluster=allow_single_cluster,
         )
 
     clusters = get_cluster_label_vector(

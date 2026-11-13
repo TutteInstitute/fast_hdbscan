@@ -159,6 +159,7 @@ def test_allow_single_cluster_with_filters():
         lens_values=centrality,
         cluster_selection_method="leaf",
         cluster_selection_epsilon=1 / 0.002,
+        allow_single_cluster=True,
     ).fit(c)
     unique_labels = np.unique(b.labels_)
     assert len(unique_labels) == 2
