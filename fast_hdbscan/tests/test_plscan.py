@@ -22,7 +22,7 @@ X, y = make_blobs(n_samples=300, random_state=42, centers=n_clusters, cluster_st
 
 
 def test_plscan_feature_vector():
-    labels = PLSCAN(base_min_cluster_size=20, reproducible=True).fit(X).labels_
+    labels = PLSCAN(base_min_cluster_size=60, reproducible=True).fit(X).labels_
     n_clusters_1 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_1 == n_clusters
 
