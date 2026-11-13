@@ -9,6 +9,7 @@ from sklearn.utils._testing import (
     assert_array_almost_equal,
 )
 from fast_hdbscan import PLSCAN
+from fast_hdbscan.layer_clusters import compute_total_persistence
 from sklearn.datasets import make_blobs
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
@@ -21,8 +22,8 @@ X, y = make_blobs(n_samples=300, random_state=42, centers=n_clusters, cluster_st
 
 
 def test_plscan_feature_vector():
-    labels = PLSCAN().fit(X).labels_
-    print(labels)
+    # A larger base size excludes small within-blob clusters from this fixture.
+    labels = PLSCAN(base_min_cluster_size=20, reproducible=True).fit(X).labels_
     n_clusters_1 = len(set(labels)) - int(-1 in labels)
     assert n_clusters_1 == n_clusters
 
@@ -71,7 +72,9 @@ def test_plscan_base_n_clusters():
 
 
 def test_plscan_multiple_layers():
-    model = PLSCAN(max_layers=3, layer_similarity_threshold=0.1).fit(X)
+    # This fixture has multiple persistence peaks with lifetime weighting.
+    data, _ = make_blobs(n_samples=300, centers=4, random_state=1)
+    model = PLSCAN(max_layers=3, layer_similarity_threshold=0.1, reproducible=True).fit(data)
     assert len(model.cluster_layers_) > 1
     # Each layer should have different clusterings
     unique_labels = [set(layer) for layer in model.cluster_layers_]
@@ -225,6 +228,19 @@ def test_plscan_total_persistence():
     """Test that total_persistence_ attribute exists."""
     model = PLSCAN().fit(X)
     assert hasattr(model, "total_persistence_")
+
+
+@pytest.mark.parametrize("weight", [0.0, 0.25, 1.0])
+def test_compute_total_persistence_weights_lifetime(weight):
+    # Index zero is the root; overlapping intervals must add their weighted lifetimes.
+    births = np.array([0, 10, 15, 20], dtype=np.float32)
+    deaths = np.array([30, 20, 25, 20], dtype=np.float32)
+    lambda_deaths = np.array([1.0, weight, 0.5, 1.0], dtype=np.float32)
+
+    sizes, persistence = compute_total_persistence(births, deaths, lambda_deaths)
+
+    assert_array_equal(sizes, [0, 10, 15, 20])
+    assert_array_almost_equal(persistence, [0.0, 10 * weight, 10 * weight + 5, 5.0])
 
 
 def test_plscan_tree_structure_validity():
