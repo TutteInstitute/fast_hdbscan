@@ -492,6 +492,9 @@ def initialize_boruvka_from_knn(
     for i in numba.prange(knn_indices.shape[0]):
         for j in range(1, knn_indices.shape[1]):
             k = np.int32(knn_indices[i, j])
+            # only a neighbour inside the core distance gives a minimum-weight edge
+            if knn_distances[i, j] > core_distances[i]:
+                break
             if core_distances[i] >= core_distances[k]:
                 # Use max of core distance and actual distance as edge weight
                 edge_weight = max(core_distances[i], knn_distances[i, j])
@@ -530,7 +533,7 @@ def sample_weight_core_distance(distances, neighbors, sample_weights, min_sample
     for i in numba.prange(distances.shape[0]):
         total_weight = 0.0
         j = 0
-        while total_weight < min_samples and j < neighbors.shape[1]:
+        while total_weight < min_samples + 1 and j < neighbors.shape[1]:
             total_weight += sample_weights[neighbors[i, j]]
             j += 1
 
@@ -562,10 +565,13 @@ def parallel_boruvka(
     n_components = point_components.shape[0]
 
     if sample_weights.shape[0] > 1:
-        mean_sample_weight = np.mean(sample_weights)
-        expected_neighbors = min_samples / mean_sample_weight
+        # enough neighbours to reach min_samples + 1 of weight (the point's own weight
+        # counts, matching the k = min_samples + 1 query below); squared distances
+        # like the unweighted branch, everything is sqrt'ed once at the end
+        min_weight = sample_weights[sample_weights > 0.0].min()
+        k = min(tree.data.shape[0], int(np.ceil((min_samples + 1) / min_weight)) + 1)
         distances, neighbors = parallel_tree_query(
-            tree, tree.data, k=int(2 * expected_neighbors)
+            tree, tree.data, k=k, output_rdist=True
         )
         core_distances = sample_weight_core_distance(
             distances, neighbors, sample_weights, min_samples
