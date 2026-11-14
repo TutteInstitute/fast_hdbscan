@@ -28,6 +28,8 @@ PlacementTree = namedtuple(
         "cluster_max_lambda",
         "subtree_max_lambda",
         "root_noise_lambda",
+        "selected_clusters",
+        "max_child_lambda",
     ],
 )
 
@@ -86,6 +88,9 @@ class PredictionData(object):
 
     placement : PlacementTree
         Condensed tree and fit results in the flat form the kernels read.
+
+    exemplars : list of ndarray
+        The exemplar points of each selected cluster, in label order.
     """
 
     def __init__(
@@ -97,11 +102,13 @@ class PredictionData(object):
         core_distances,
         min_samples,
         cluster_selection_epsilon,
+        exemplars=None,
     ):
         self.raw_data = data
         self.tree = build_kdtree(data)
         self.has_tree = condensed_tree.shape[0] > 0
         self.n_selected_clusters = len(selected_clusters)
+        self.exemplars = exemplars
         if not self.has_tree:
             self.placement = None
             return
@@ -118,6 +125,8 @@ class PredictionData(object):
         node_lambda = np.zeros(n_nodes, dtype=np.float64)
         node_parent[child] = parent
         node_lambda[child] = lambda_val
+        max_child_lambda = np.zeros(n_nodes, dtype=np.float64)
+        np.maximum.at(max_child_lambda, parent, lambda_val)
 
         cluster_label, cluster_max_lambda = _cluster_labels(
             parent, child, lambda_val, child_size, node_parent, root, selected_clusters
@@ -135,6 +144,8 @@ class PredictionData(object):
             root_noise_lambda=_root_noise_lambda(
                 lambda_val, parent, root, selected_clusters, cluster_selection_epsilon
             ),
+            selected_clusters=selected_clusters,
+            max_child_lambda=max_child_lambda,
         )
 
     def query(self, points):
@@ -333,3 +344,121 @@ def approximate_predict_scores(clusterer, points_to_predict):
     return predict_outlier_scores(
         neighbor_distances, neighbor_indices, prediction_data.placement
     )
+
+
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
+def merge_heights(points, placement):
+    """Lambda at which each point's cluster joins each selected cluster, or
+    the point's own lambda when one of them sits below the other, as in
+    hdbscan's ``merge_height``.
+    """
+    clusters = placement.selected_clusters
+    heights = np.empty((points.shape[0], clusters.shape[0]), dtype=np.float64)
+    for i in numba.prange(points.shape[0]):
+        point_cluster = placement.node_parent[points[i]]
+        for j in range(clusters.shape[0]):
+            left = point_cluster
+            right = clusters[j]
+            last = left
+            took_left = False
+            took_right = False
+            # parents have smaller ids than their children
+            while left != right:
+                if left > right:
+                    took_left = True
+                    last = left
+                    left = placement.node_parent[left]
+                else:
+                    took_right = True
+                    last = right
+                    right = placement.node_parent[right]
+            if took_left and took_right:
+                heights[i, j] = placement.node_lambda[last]
+            else:
+                heights[i, j] = placement.node_lambda[points[i]]
+    return heights
+
+
+@numba.njit(parallel=True, cache=NUMBA_CACHE)
+def min_exemplar_distances(points, exemplars, exemplar_labels, n_clusters):
+    """Euclidean distance from each point to the nearest exemplar of each cluster."""
+    distances = np.full((points.shape[0], n_clusters), np.inf)
+    for i in numba.prange(points.shape[0]):
+        for e in range(exemplars.shape[0]):
+            distance = np.sqrt(np.sum((points[i] - exemplars[e]) ** 2))
+            if distance < distances[i, exemplar_labels[e]]:
+                distances[i, exemplar_labels[e]] = distance
+    return distances
+
+
+def all_points_membership_vectors(clusterer):
+    """Soft cluster membership of every point the clusterer was fit on.
+
+    Follows hdbscan's ``all_points_membership_vectors``: each point's vector
+    combines its distance to each cluster's exemplars with the lambda at which
+    its place in the condensed tree merges with each cluster, scaled by the
+    probability that it belongs to any cluster at all.
+
+    Parameters
+    ----------
+    clusterer : HDBSCAN
+        A fitted clusterer with prediction data (``prediction_data=True`` or
+        ``generate_prediction_data()``).
+
+    Returns
+    -------
+    membership_vectors : array, shape (n_samples, n_clusters)
+        The probability that point ``i`` belongs to cluster ``j``. Rows of
+        non-finite training points are zero.
+    """
+    prediction_data = getattr(clusterer, "prediction_data_", None)
+    if prediction_data is None:
+        raise ValueError(
+            "Clusterer does not have prediction data! Try fitting with"
+            " prediction_data=True set, or run generate_prediction_data on the clusterer"
+        )
+    # columns follow labels_: epsilon can select the root yet label every point noise
+    n_clusters = clusterer.labels_.max() + 1
+    result = np.zeros((clusterer.labels_.shape[0], n_clusters), dtype=np.float64)
+    if n_clusters == 0:
+        return result
+
+    placement = prediction_data.placement
+    points = placement.fit_row_index
+    if (placement.node_parent[points] == points).any():
+        raise ValueError(
+            "Some training points are missing from the condensed tree, as"
+            " min_cluster_size=1 can leave them; soft clustering needs them all."
+        )
+    exemplar_labels = np.repeat(
+        np.arange(n_clusters), [len(exemplars) for exemplars in prediction_data.exemplars]
+    )
+    distances = min_exemplar_distances(
+        prediction_data.raw_data.astype(np.float64),
+        np.vstack(prediction_data.exemplars).astype(np.float64),
+        exemplar_labels,
+        n_clusters,
+    )
+    with np.errstate(divide="ignore"):
+        distance_vectors = 1.0 / distances
+    # an exemplar is at distance zero from its own cluster
+    distance_vectors[distances == 0] = np.finfo(np.float64).max / n_clusters
+    distance_vectors /= distance_vectors.sum(axis=1, keepdims=True)
+
+    heights = merge_heights(points, placement)
+    point_lambda = placement.node_lambda[points]
+    point_max_lambda = placement.max_child_lambda[placement.node_parent[points]] + 1e-8
+    with np.errstate(divide="ignore"):
+        scores = np.exp(-(point_max_lambda[:, None] / heights))
+    outlier_vectors = np.exp(scores - np.nanmax(scores))
+    outlier_vectors /= outlier_vectors.sum(axis=1, keepdims=True)
+
+    nearest_cluster = placement.selected_clusters[heights.argmax(axis=1)]
+    prob_in_some_cluster = heights.max(axis=1) / np.maximum(
+        placement.max_child_lambda[nearest_cluster], point_lambda
+    )
+
+    vectors = distance_vectors * outlier_vectors
+    vectors /= vectors.sum(axis=1, keepdims=True)
+    result[points] = vectors * prob_in_some_cluster[:, None]
+    return result
