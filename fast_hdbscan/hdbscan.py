@@ -1307,7 +1307,7 @@ class PLSCAN(ClusterMixin, BaseEstimator):
     >>> clusterer = fast_hdbscan.PLSCAN()
     >>> labels = clusterer.fit_predict(data)
     >>> len(clusterer.cluster_layers_)  # number of resolution layers found
-    1
+    3
 
     References
     ----------
