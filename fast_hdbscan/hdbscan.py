@@ -1030,6 +1030,12 @@ class HDBSCAN(ClusterMixin, BaseEstimator):
             self._core_distances,
             self.min_cluster_size if self.min_samples is None else self.min_samples,
             self.cluster_selection_epsilon,
+            [
+                self._raw_data[indices]
+                for indices in cluster_exemplar_indices(
+                    self._condensed_tree, self._selected_clusters, len(self.labels_)
+                )
+            ],
         )
 
     def dbscan_clustering(self, epsilon):
