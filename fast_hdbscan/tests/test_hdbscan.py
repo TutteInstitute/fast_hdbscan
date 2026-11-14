@@ -17,6 +17,7 @@ from fast_hdbscan import (
     fast_hdbscan,
 )
 from fast_hdbscan.hdbscan import clusters_from_spanning_tree
+from fast_hdbscan.cluster_trees import segments_in_branch
 
 # from sklearn.cluster.tests.common import generate_clustered_data
 from sklearn.datasets import make_blobs
@@ -794,3 +795,36 @@ def test_issue_63_no_spurious_noise():
         assert noise_ratio < 0.9, (
             f"seed={seed}: {noise_ratio:.0%} noise, expected < 90%"
         )
+
+
+def test_segments_in_branch_of_leaf_is_only_the_leaf():
+    """A leaf has no children, so its branch is just itself, not the children of
+    the next parent in sorted order. Regression test for #63, fixed in #72.
+    """
+    parents = np.array([5, 5, 7, 7])
+    children = np.array([6, 7, 8, 9])
+    assert segments_in_branch(parents, children, 6) == {6}
+
+
+def test_epsilon_search_keeps_unrelated_subtree():
+    """Merging one branch up to epsilon must not drop clusters in another branch.
+
+    Cluster tree: P splits into two blobs 1 apart; Q holds Q2, Q1b and Q1a, and
+    Q1a splits into two blobs 1 apart. With epsilon=2, P is selected and its
+    branch is marked as processed. The lookup for P's leaves used to return
+    Q1a's children too, so they were skipped and Q1a's 60 points became noise.
+    Regression test for #63, fixed in #72.
+    """
+    blobs = [
+        ((0, 0), 30),
+        ((1, 0), 30),
+        ((30, 0), 30),
+        ((31, 0), 30),
+        ((30, 4), 40),
+        ((30, 12), 40),
+    ]
+    rng = np.random.default_rng(0)
+    X = np.vstack([rng.normal(center, 0.1, size=(n, 2)) for center, n in blobs])
+    labels = HDBSCAN(min_cluster_size=20, cluster_selection_epsilon=2.0).fit_predict(X)
+    assert np.sum(labels == -1) == 0
+    assert len(np.unique(labels)) == 4
