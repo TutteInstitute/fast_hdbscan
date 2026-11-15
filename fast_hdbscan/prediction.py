@@ -382,12 +382,18 @@ def merge_heights(points, placement):
 @numba.njit(parallel=True, cache=NUMBA_CACHE)
 def min_exemplar_distances(points, exemplars, exemplar_labels, n_clusters):
     """Euclidean distance from each point to the nearest exemplar of each cluster."""
+    # a scalar loop over features avoids allocating a temporary array per pair
     distances = np.full((points.shape[0], n_clusters), np.inf)
     for i in numba.prange(points.shape[0]):
         for e in range(exemplars.shape[0]):
-            distance = np.sqrt(np.sum((points[i] - exemplars[e]) ** 2))
-            if distance < distances[i, exemplar_labels[e]]:
-                distances[i, exemplar_labels[e]] = distance
+            squared_distance = 0.0
+            for f in range(points.shape[1]):
+                difference = points[i, f] - exemplars[e, f]
+                squared_distance += difference * difference
+            if squared_distance < distances[i, exemplar_labels[e]]:
+                distances[i, exemplar_labels[e]] = squared_distance
+        for j in range(n_clusters):
+            distances[i, j] = np.sqrt(distances[i, j])
     return distances
 
 
