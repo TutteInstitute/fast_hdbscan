@@ -117,6 +117,21 @@ def to_numpy_rec_array(named_tuple_tree):
     return result
 
 
+def _remap_node_ids(node_ids, internal_to_raw, outlier_count):
+    """Map point ids to raw row ids and shift cluster ids past the outliers."""
+    finite_count = len(internal_to_raw)
+    # fit() inserts the keys 0..finite_count-1 in order, so values() is the lookup
+    raw_index = np.fromiter(
+        internal_to_raw.values(), dtype=np.intp, count=finite_count
+    )
+    # Negative ids (min_samples >= finite points) must raise, not wrap via raw_index[-1]
+    if node_ids.size and node_ids.min() < 0:
+        raise KeyError(node_ids.min())
+    is_point = node_ids < finite_count
+    point_ids = np.where(is_point, node_ids, 0).astype(np.intp)
+    return np.where(is_point, raw_index[point_ids], node_ids + outlier_count)
+
+
 def remap_condensed_tree(tree, internal_to_raw, outliers):
     """
     Takes an internal condensed_tree structure and adds back in a set of points
@@ -131,15 +146,9 @@ def remap_condensed_tree(tree, internal_to_raw, outliers):
     finite_index: ndarray
         Boolean array of which entries in the raw data were finite
     """
-    finite_count = len(internal_to_raw)
-
     outlier_count = len(outliers)
-    for i, (parent, child, lambda_val, child_size) in enumerate(tree):
-        if child < finite_count:
-            child = internal_to_raw[child]
-        else:
-            child = child + outlier_count
-        tree[i] = (parent + outlier_count, child, lambda_val, child_size)
+    tree["child"] = _remap_node_ids(tree["child"], internal_to_raw, outlier_count)
+    tree["parent"] += outlier_count
 
     outlier_list = []
     root = tree[0][0]  # Should I check to be sure this is the minimal lambda?
@@ -173,18 +182,11 @@ def remap_single_linkage_tree(tree, internal_to_raw, outliers):
     finite_index: ndarray
         Boolean array of which entries in the raw data were finite
     """
-    finite_count = len(internal_to_raw)
-
     outlier_count = len(outliers)
-    for i, (left, right, distance, size) in enumerate(tree):
-        if left < finite_count:
-            tree[i, 0] = internal_to_raw[left]
-        else:
-            tree[i, 0] = left + outlier_count
-        if right < finite_count:
-            tree[i, 1] = internal_to_raw[right]
-        else:
-            tree[i, 1] = right + outlier_count
+    for column in (0, 1):
+        tree[:, column] = _remap_node_ids(
+            tree[:, column], internal_to_raw, outlier_count
+        )
 
     outlier_tree = np.zeros((len(outliers), 4))
     last_cluster_id = tree[tree.shape[0] - 1][0:2].max()
