@@ -331,25 +331,19 @@ def bridge_forest_with_inf(edges, component_labels, n):
     -------
     edges : np.ndarray, shape (n-1, 3)
     """
-    unique_components = np.unique(component_labels)
-    if len(unique_components) == 1:
+    _, first_node = np.unique(component_labels, return_index=True)
+    if len(first_node) == 1:
         return edges
 
-    # Deterministic representative = smallest node id per component
-    representatives = []
-    for comp in unique_components:
-        nodes_in_comp = np.where(component_labels == comp)[0]
-        representatives.append(int(nodes_in_comp.min()))
-
-    representatives.sort()
+    representatives = np.sort(first_node).astype(np.float64)
 
     # +inf bridge edges between consecutive representatives
-    bridge_edges = np.array(
+    bridge_edges = np.column_stack(
         [
-            (float(representatives[i]), float(representatives[i + 1]), np.inf)
-            for i in range(len(representatives) - 1)
-        ],
-        dtype=np.float64,
+            representatives[:-1],
+            representatives[1:],
+            np.full(len(representatives) - 1, np.inf),
+        ]
     )
 
     if edges.shape[0] == 0:
