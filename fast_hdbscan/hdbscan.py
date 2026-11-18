@@ -677,6 +677,7 @@ def clusters_from_spanning_tree(
                 max_cluster_size=max_cluster_size,
                 allow_single_cluster=allow_single_cluster,
                 cluster_selection_epsilon_max=cluster_selection_epsilon_max,
+                sample_weights=sample_weights,
             )
     elif cluster_selection_method == "leaf":
         if cluster_tree.parent.shape[0] == 0:

@@ -658,17 +658,20 @@ def extract_clusters_bcubed(
 
 
 @numba.njit(cache=NUMBA_CACHE)
-def score_condensed_tree_nodes(condensed_tree):
+def score_condensed_tree_nodes(condensed_tree, sample_weights=None):
     root = condensed_tree.parent[0]
     result = {root: np.float32(0.0)}
 
     for i in range(condensed_tree.parent.shape[0]):
-        if condensed_tree.child_size[i] > 1:
+        child_size = condensed_tree.child_size[i]
+        if child_size > 1:
             child = condensed_tree.child[i]
             result[child] = -condensed_tree.lambda_val[i] * condensed_tree.child_size[i]
+        elif sample_weights is not None:
+            child_size = sample_weights[condensed_tree.child[i]]
 
         parent = condensed_tree.parent[i]
-        result[parent] += condensed_tree.lambda_val[i] * condensed_tree.child_size[i]
+        result[parent] += condensed_tree.lambda_val[i] * child_size
 
     return result
 
@@ -764,8 +767,9 @@ def extract_eom_clusters(
     max_cluster_size=np.inf,
     allow_single_cluster=False,
     cluster_selection_epsilon_max=np.inf,
+    sample_weights=None,
 ):
-    node_scores = score_condensed_tree_nodes(condensed_tree)
+    node_scores = score_condensed_tree_nodes(condensed_tree, sample_weights)
     if len(cluster_tree.parent) > 0:
         node_sizes = {
             node: size
