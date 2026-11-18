@@ -2,6 +2,11 @@ import numpy as np
 import pytest
 from sklearn.datasets import make_blobs
 from fast_hdbscan import HDBSCAN
+from fast_hdbscan.cluster_trees import (
+    CondensedTree,
+    cluster_tree_from_condensed_tree,
+    extract_eom_clusters,
+)
 
 
 class TestEdgeCaseInputs:
@@ -78,3 +83,28 @@ class TestEdgeCaseInputs:
         model = HDBSCAN(min_cluster_size=15, cluster_selection_persistence=0.01).fit(X)
         np.testing.assert_array_equal(model._condensed_tree, baseline._condensed_tree)
         np.testing.assert_array_equal(model.labels_, baseline.labels_)
+
+
+def test_extract_eom_clusters_deep_cluster_tree():
+    depth = 10_000
+    n_points = 2 * depth + 2
+    level = np.arange(depth)
+    node = n_points + 2 * level
+    leaf = node + 1
+    last = n_points + 2 * depth
+    tree = CondensedTree(
+        np.concatenate([node, node, leaf, leaf, [last, last]]).astype(np.intp),
+        np.concatenate(
+            [node + 2, leaf, 2 * level, 2 * level + 1, [2 * depth, 2 * depth + 1]]
+        ).astype(np.intp),
+        np.concatenate(
+            [level + 1, level + 1, level + 2, level + 2, [depth + 1, depth + 1]]
+        ).astype(np.float32),
+        np.concatenate(
+            [2 * (depth - level), np.full(depth, 2), np.ones(2 * depth), [1, 1]]
+        ).astype(np.float32),
+    )
+
+    clusters = extract_eom_clusters(tree, cluster_tree_from_condensed_tree(tree))
+
+    assert len(clusters) == 2
