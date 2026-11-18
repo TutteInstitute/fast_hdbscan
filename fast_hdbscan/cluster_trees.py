@@ -699,11 +699,13 @@ def cluster_tree_children(node, cluster_tree, child_order, sorted_parents):
 def unselect_below_node(
     node, cluster_tree, selected_clusters, child_order, sorted_parents
 ):
-    for child in cluster_tree_children(node, cluster_tree, child_order, sorted_parents):
-        unselect_below_node(
-            child, cluster_tree, selected_clusters, child_order, sorted_parents
-        )
-        selected_clusters[child] = False
+    stack = [node]
+    while stack:
+        for child in cluster_tree_children(
+            stack.pop(), cluster_tree, child_order, sorted_parents
+        ):
+            selected_clusters[child] = False
+            stack.append(child)
 
 
 @numba.njit(fastmath=True, cache=NUMBA_CACHE)
@@ -719,40 +721,40 @@ def eom_recursion(
     child_order,
     sorted_parents,
 ):
-    current_score = max(
-        node_scores[node], 0.0
-    )  # floating point errors can make score negative!
-    current_size = node_sizes[node]
-
-    children = cluster_tree_children(node, cluster_tree, child_order, sorted_parents)
-    child_score_total = 0.0
-
-    for child_node in children:
-        child_score_total += eom_recursion(
-            child_node,
-            cluster_tree,
-            node_scores,
-            node_sizes,
-            selected_clusters,
-            max_cluster_size,
-            node_birth_distances,
-            max_birth_distance,
-            child_order,
-            sorted_parents,
+    subtree_scores = {node: 0.0}
+    stack = [(node, False)]
+    while stack:
+        current, children_done = stack.pop()
+        children = cluster_tree_children(
+            current, cluster_tree, child_order, sorted_parents
         )
+        if not children_done:
+            stack.append((current, True))
+            for child_node in children[::-1]:
+                stack.append((child_node, False))
+            continue
 
-    if (
-        child_score_total > current_score
-        or current_size > max_cluster_size
-        or node_birth_distances[node] > max_birth_distance
-    ):
-        return child_score_total
-    else:
-        selected_clusters[node] = True
-        unselect_below_node(
-            node, cluster_tree, selected_clusters, child_order, sorted_parents
-        )
-        return current_score
+        current_score = max(
+            node_scores[current], 0.0
+        )  # floating point errors can make score negative!
+        child_score_total = 0.0
+        for child_node in children:
+            child_score_total += subtree_scores[child_node]
+
+        if (
+            child_score_total > current_score
+            or node_sizes[current] > max_cluster_size
+            or node_birth_distances[current] > max_birth_distance
+        ):
+            subtree_scores[current] = child_score_total
+        else:
+            selected_clusters[current] = True
+            unselect_below_node(
+                current, cluster_tree, selected_clusters, child_order, sorted_parents
+            )
+            subtree_scores[current] = current_score
+
+    return subtree_scores[node]
 
 
 @numba.njit(cache=NUMBA_CACHE)
