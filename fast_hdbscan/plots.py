@@ -524,15 +524,6 @@ class CondensedTree(object):
         return result
 
 
-def _get_dendrogram_ordering(parent, linkage, root):
-
-    if parent < root:
-        return []
-
-    return _get_dendrogram_ordering(int(linkage[parent-root][0]), linkage, root) + \
-            _get_dendrogram_ordering(int(linkage[parent-root][1]), linkage, root) + [parent]
-
-
 def _calculate_linewidths(ordering, linkage, root):
 
     linewidths = []
@@ -616,7 +607,14 @@ class SingleLinkageTree(object):
         """
         from scipy.cluster.hierarchy import dendrogram
 
-        dendrogram_data = dendrogram(self._linkage, p=p, truncate_mode=truncate_mode, no_plot=True)
+        drawn_links = []
+
+        def record_link(link):
+            drawn_links.append(link)
+            return 'k'
+
+        dendrogram_data = dendrogram(self._linkage, p=p, truncate_mode=truncate_mode, no_plot=True,
+                                     link_color_func=record_link)
         X = dendrogram_data['icoord']
         Y = dendrogram_data['dcoord']
 
@@ -629,15 +627,14 @@ class SingleLinkageTree(object):
             axis = plt.gca()
 
         if vary_line_width:
-            dendrogram_ordering = _get_dendrogram_ordering(2 * len(self._linkage), self._linkage, len(self._linkage) + 1)
-            linewidths = _calculate_linewidths(dendrogram_ordering, self._linkage, len(self._linkage) + 1)
+            linewidths = _calculate_linewidths(drawn_links, self._linkage, len(self._linkage) + 1)
         else:
             linewidths = [(1.0, 1.0)] * len(Y)
 
         if cmap != 'none':
             color_array = np.log2(np.array(linewidths).flatten())
             sm = plt.cm.ScalarMappable(cmap=cmap,
-                                       norm=plt.Normalize(0, color_array.max()))
+                                       norm=plt.Normalize(0, color_array.max(initial=0)))
             sm.set_array(color_array)
 
         for x, y, lw in zip(X, Y, linewidths):
