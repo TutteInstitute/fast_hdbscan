@@ -192,6 +192,35 @@ def test_single_linkage_tree_plot(model, plt):
     )
 
 
+def one_point_per_merge_linkage(n_points):
+    linkage = np.zeros((n_points - 1, 4))
+    linkage[0] = (0, 1, 1.0, 2)
+    for row in range(1, n_points - 1):
+        linkage[row] = (n_points + row - 1, row + 1, row + 1.0, row + 2)
+    return linkage
+
+
+def test_single_linkage_tree_plot_truncated_deep_tree(plt):
+    deeper_than_recursion_limit = sys.getrecursionlimit() + 1000
+    SingleLinkageTree(one_point_per_merge_linkage(deeper_than_recursion_limit)).plot(
+        truncate_mode="lastp", p=10
+    )
+
+
+def test_single_linkage_tree_plot_truncated_to_no_links(plt):
+    SingleLinkageTree(one_point_per_merge_linkage(5)).plot(truncate_mode="lastp", p=1)
+
+
+def test_single_linkage_tree_plot_truncated_line_widths(plt):
+    n_points = 20
+    axis = SingleLinkageTree(one_point_per_merge_linkage(n_points)).plot(
+        truncate_mode="lastp", p=3, colorbar=False
+    )
+    root_left, root_right, _ = axis.lines[-3:]
+    assert root_left.get_linewidth() == pytest.approx(np.log2(1 + n_points - 1))
+    assert root_right.get_linewidth() == pytest.approx(np.log2(1 + 1))
+
+
 def test_minimum_spanning_tree_plot(model, plt):
     model.minimum_spanning_tree_.plot(edge_cmap="Reds")
 
